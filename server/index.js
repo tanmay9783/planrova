@@ -89,6 +89,34 @@ app.post('/api/import', (req, res) => {
   }
 });
 
+// ── Proxy Groq OCR request to bypass SSL/Network restrictions on emulator ──
+app.post('/api/ocr', async (req, res) => {
+  try {
+    const { apiKey, payload } = req.body;
+    if (!apiKey) {
+      return res.status(400).json({ error: "Missing API Key" });
+    }
+    const response = await fetch(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(payload)
+      }
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json(data);
+    }
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Health check ──────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: Date.now() });

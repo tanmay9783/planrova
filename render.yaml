@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: planory-ocr-proxy
+    runtime: node
+    rootDir: server
+    buildCommand: echo "No build needed"
+    startCommand: node proxy.js
+    plan: free
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false   # Set this manually in Render dashboard — never commit the actual value

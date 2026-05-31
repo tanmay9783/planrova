@@ -1,17 +1,136 @@
-import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from '../firebase';
+
+const { width } = Dimensions.get('window');
+const TILE_WIDTH = (width - 64) / 2; // 24px padding on left/right + 16px gap
+
+const MODULES = [
+  {
+    id: 'notes',
+    screenName: 'NotesWorkspace',
+    title: 'Notes',
+    desc: 'Access your day-linked drafts',
+    icon: 'document-text',
+    color: '#A855F7',
+    bgColor: 'rgba(168, 85, 247, 0.15)'
+  },
+  {
+    id: 'water',
+    screenName: 'HydrationWorkspace',
+    title: 'Water Log',
+    desc: 'Log preset beverages & SVG stats',
+    icon: 'water',
+    color: '#3B82F6',
+    bgColor: 'rgba(59, 130, 246, 0.15)'
+  },
+  {
+    id: 'budget',
+    screenName: 'BudgetWorkspace',
+    title: 'Budget',
+    desc: 'Log expenses & savings progress',
+    icon: 'cash',
+    color: '#10B981',
+    bgColor: 'rgba(16, 185, 129, 0.15)'
+  },
+  {
+    id: 'timer',
+    screenName: 'FocusWorkspace',
+    title: 'Timer',
+    desc: 'Focus interval rounds and timers',
+    icon: 'timer',
+    color: '#F59E0B',
+    bgColor: 'rgba(245, 158, 11, 0.15)'
+  },
+  {
+    id: 'alarm',
+    screenName: 'AlarmWorkspace',
+    title: 'Alarms',
+    desc: 'Missions & Sleep intelligence',
+    icon: 'alarm',
+    color: '#EF4444',
+    bgColor: 'rgba(239, 68, 68, 0.15)'
+  },
+  {
+    id: 'profile',
+    screenName: 'ProfileWorkspace',
+    title: 'Profile',
+    desc: 'Student bio and goal edits',
+    icon: 'person',
+    color: '#F97316',
+    bgColor: 'rgba(249, 115, 22, 0.15)'
+  },
+  {
+    id: 'notifications',
+    screenName: 'NotificationCenterWorkspace',
+    title: 'Quiet Hours',
+    desc: 'Study quiet hours & tones',
+    icon: 'notifications',
+    color: '#6366F1',
+    bgColor: 'rgba(99, 102, 241, 0.15)'
+  },
+  {
+    id: 'analytics',
+    screenName: 'AnalyticsWorkspace',
+    title: 'Analytics',
+    desc: 'Deep study stats & streaks',
+    icon: 'bar-chart',
+    color: '#7C9B7A',
+    bgColor: 'rgba(124, 155, 122, 0.15)'
+  }
+];
 
 export default function WorkspaceHubModal({ visible, onClose }) {
   const navigation = useNavigation();
   const emailPrefix = auth.currentUser?.email ? auth.currentUser.email.split('@')[0] : 'Student';
+  const [sortedModules, setSortedModules] = useState(MODULES);
 
-  const handleNavigate = (screenName) => {
+  useEffect(() => {
+    if (visible) {
+      loadAccessHistory();
+    }
+  }, [visible]);
+
+  const loadAccessHistory = async () => {
+    try {
+      const historyStr = await AsyncStorage.getItem('hub_recently_accessed');
+      if (historyStr) {
+        const history = JSON.parse(historyStr);
+        const sorted = [...MODULES].sort((a, b) => {
+          const idxA = history.indexOf(a.id);
+          const idxB = history.indexOf(b.id);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+          return 0;
+        });
+        setSortedModules(sorted);
+      } else {
+        setSortedModules(MODULES);
+      }
+    } catch (e) {
+      console.warn('Failed to load hub access history', e);
+      setSortedModules(MODULES);
+    }
+  };
+
+  const handleNavigate = async (module) => {
+    try {
+      const historyStr = await AsyncStorage.getItem('hub_recently_accessed');
+      let history = historyStr ? JSON.parse(historyStr) : [];
+      history = history.filter(id => id !== module.id);
+      history.unshift(module.id);
+      history = history.slice(0, 10);
+      await AsyncStorage.setItem('hub_recently_accessed', JSON.stringify(history));
+    } catch (e) {
+      console.warn('Failed to update hub access history', e);
+    }
     onClose();
-    navigation.navigate(screenName);
+    navigation.navigate(module.screenName);
   };
 
   return (
@@ -28,76 +147,25 @@ export default function WorkspaceHubModal({ visible, onClose }) {
         </View>
         <Text style={styles.subtitle}>Select a productivity module to expand</Text>
 
-        <ScrollView contentContainerStyle={styles.list}>
-          {/* Notes */}
-          <TouchableOpacity style={styles.card} onPress={() => handleNavigate('NotesWorkspace')} activeOpacity={0.8}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="document-text" size={28} color="#C2A878" />
-              <View style={styles.badge}><Text style={styles.badgeText}>Rich Notes</Text></View>
-            </View>
-            <Text style={styles.cardTitle}>Subject Notes & Text Editor</Text>
-            <Text style={styles.cardDesc}>Access your full library of day-linked rich lecture drafts, past versions, templates, and full text search keywords.</Text>
-          </TouchableOpacity>
-
-          {/* Hydration */}
-          <TouchableOpacity style={styles.card} onPress={() => handleNavigate('HydrationWorkspace')} activeOpacity={0.8}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="water" size={28} color="#7B93B0" />
-              <View style={[styles.badge, { backgroundColor: 'rgba(123, 147, 176, 0.15)' }]}><Text style={[styles.badgeText, { color: '#7B93B0' }]}>Water Log</Text></View>
-            </View>
-            <Text style={styles.cardTitle}>Water Hydration Workspace</Text>
-            <Text style={styles.cardDesc}>Log preset beverages (glasses, bottles, diuretic tea coffee), check weekly SVG statistics and study alerts.</Text>
-          </TouchableOpacity>
-
-          {/* Budget */}
-          <TouchableOpacity style={styles.card} onPress={() => handleNavigate('BudgetWorkspace')} activeOpacity={0.8}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="cash" size={28} color="#7C9B7A" />
-              <View style={[styles.badge, { backgroundColor: 'rgba(124, 155, 122, 0.15)' }]}><Text style={[styles.badgeText, { color: '#7C9B7A' }]}>Student Budget</Text></View>
-            </View>
-            <Text style={styles.cardTitle}>Expense Tracker & Savings goals</Text>
-            <Text style={styles.cardDesc}>Log daily expenses, calculate budget warning limits, check savings goal progress and dynamic EOM advice.</Text>
-          </TouchableOpacity>
-
-          {/* Focus */}
-          <TouchableOpacity style={styles.card} onPress={() => handleNavigate('FocusWorkspace')} activeOpacity={0.8}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="timer" size={28} color="#C47070" />
-              <View style={[styles.badge, { backgroundColor: 'rgba(196, 112, 112, 0.15)' }]}><Text style={[styles.badgeText, { color: '#C47070' }]}>Pomodoro Focus</Text></View>
-            </View>
-            <Text style={styles.cardTitle}>Pomodoro Focus Timer</Text>
-            <Text style={styles.cardDesc}>Start focus interval rounds, auto-track productivity, and assign active timetable tasks to countdown timers.</Text>
-          </TouchableOpacity>
-
-          {/* Alarm & Sleep */}
-          <TouchableOpacity style={styles.card} onPress={() => handleNavigate('AlarmWorkspace')} activeOpacity={0.8}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="alarm" size={28} color="#E11D48" />
-              <View style={[styles.badge, { backgroundColor: 'rgba(225, 29, 72, 0.15)' }]}><Text style={[styles.badgeText, { color: '#E11D48' }]}>Alarms & Sleep</Text></View>
-            </View>
-            <Text style={styles.cardTitle}>Alarm Missions & Sleep Intelligence</Text>
-            <Text style={styles.cardDesc}>Configure routine alarms, choose Math/Shake/Typing/Walking wake-up missions, and log sleep cycles to keep alert.</Text>
-          </TouchableOpacity>
-
-          {/* Profile */}
-          <TouchableOpacity style={styles.card} onPress={() => handleNavigate('ProfileWorkspace')} activeOpacity={0.8}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="person" size={28} color="#C2A878" />
-              <View style={[styles.badge, { backgroundColor: 'rgba(194, 168, 120, 0.15)' }]}><Text style={[styles.badgeText, { color: '#C2A878' }]}>Edit Profile</Text></View>
-            </View>
-            <Text style={styles.cardTitle}>Student Profile & Customization</Text>
-            <Text style={styles.cardDesc}>Change your display name, edit focus bio, customize goals, and sign out of your student workspace securely.</Text>
-          </TouchableOpacity>
-
-          {/* Notifications */}
-          <TouchableOpacity style={styles.card} onPress={() => handleNavigate('NotificationCenterWorkspace')} activeOpacity={0.8}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="notifications" size={28} color="#4B6BFB" />
-              <View style={[styles.badge, { backgroundColor: 'rgba(75, 107, 251, 0.15)' }]}><Text style={[styles.badgeText, { color: '#4B6BFB' }]}>Quiet Hours</Text></View>
-            </View>
-            <Text style={styles.cardTitle}>Notification Center</Text>
-            <Text style={styles.cardDesc}>Configure study quiet hours, customize reminder alerts, and set study tones.</Text>
-          </TouchableOpacity>
+        <ScrollView contentContainerStyle={styles.gridContainer}>
+          <View style={styles.grid}>
+            {sortedModules.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.tile}
+                onPress={() => handleNavigate(item)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.tileHeader}>
+                  <View style={[styles.tileIconBg, { backgroundColor: item.bgColor }]}>
+                    <Ionicons name={item.icon} size={18} color={item.color} />
+                  </View>
+                  <Text style={styles.tileTitle} numberOfLines={1}>{item.title}</Text>
+                </View>
+                <Text style={styles.tileDesc} numberOfLines={1}>{item.desc}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -111,13 +179,44 @@ const styles = StyleSheet.create({
   headerTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 24, color: '#F3F1EC' },
   closeBtn: { padding: 4 },
   subtitle: { fontFamily: 'PlusJakartaSans_500Medium', color: '#8B92A0', fontSize: 14, paddingHorizontal: 24, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-  
-  list: { padding: 24, gap: 16 },
-  card: { backgroundColor: '#171B22', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.03)' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  emoji: { fontSize: 24 },
-  badge: { backgroundColor: 'rgba(194, 168, 120, 0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  badgeText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 10, color: '#C2A878' },
-  cardTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18, color: '#F3F1EC', marginBottom: 8 },
-  cardDesc: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: '#8B92A0', lineHeight: 20 }
+  gridContainer: { padding: 24 },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  tile: {
+    backgroundColor: '#171B22',
+    borderRadius: 16,
+    padding: 14,
+    width: TILE_WIDTH,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+    marginBottom: 16,
+  },
+  tileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 8,
+  },
+  tileIconBg: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tileTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 14,
+    color: '#F3F1EC',
+    flex: 1,
+  },
+  tileDesc: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 11,
+    color: '#8B92A0',
+    lineHeight: 15,
+  }
 });

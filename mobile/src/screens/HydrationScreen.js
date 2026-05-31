@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, TextInput, Modal, Platform, StatusBar, Animated, Dimensions, Vibration } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, TextInput, Modal, Platform, StatusBar, Animated, Dimensions, Vibration, RefreshControl } from 'react-native';
 import { useFirestoreData } from '../hooks/useFirestoreData';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../firebase';
@@ -24,6 +24,14 @@ export default function HydrationScreen() {
   const [logs, setLogs] = useFirestoreData(`${userId}_hydration_logs`, []);
   const [gamification, setGamification] = useFirestoreData(`${userId}_gamification_state`, { level: 1, xp: 0 });
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1500);
+  };
+
   const confettiRef = useRef(null);
   const xpFlyRef = useRef(null);
   const { width, height } = Dimensions.get('window');
@@ -32,6 +40,7 @@ export default function HydrationScreen() {
   const [isIndianSummer, setIsIndianSummer] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [customGoalInput, setCustomGoalInput] = useState('2000');
+  const [goalError, setGoalError] = useState('');
   
   // Selection index for Quick Add drink
   const [selectedDrinkIdx, setSelectedDrinkIdx] = useState(0);
@@ -314,12 +323,22 @@ export default function HydrationScreen() {
   return (
     <View style={styles.container}>
       <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
+        <ScrollView 
+          contentContainerStyle={{ padding: 20, paddingBottom: 60 }}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh} 
+              colors={['#C2A878']} 
+              tintColor="#C2A878" 
+            />
+          }
+        >
           
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Water log</Text>
-            <TouchableOpacity style={styles.settingsBtn} onPress={() => setShowSettingsModal(true)}>
+            <TouchableOpacity style={styles.settingsBtn} onPress={() => { setGoalError(''); setCustomGoalInput(baseTarget.toString()); setShowSettingsModal(true); }}>
               <Ionicons name="settings-sharp" size={16} color="#C2A878" />
               <Text style={styles.settingsBtnText}>Settings</Text>
             </TouchableOpacity>
@@ -533,16 +552,34 @@ export default function HydrationScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Hydration Settings</Text>
             <Text style={styles.modalSubtitle}>Configure your base daily goal target (ml)</Text>
-            
-            <TextInput
+                <TextInput
               style={styles.modalInput}
               keyboardType="numeric"
               placeholder="e.g. 2000"
               placeholderTextColor="#5A6070"
               value={customGoalInput}
-              onChangeText={setCustomGoalInput}
+              onChangeText={(text) => {
+                setCustomGoalInput(text);
+                setGoalError('');
+              }}
               autoFocus
             />
+            
+            {goalError ? (
+              <Text style={styles.errorText}>{goalError}</Text>
+            ) : null}
+
+            <TouchableOpacity 
+              style={styles.resetBtn} 
+              onPress={() => {
+                setHydration(prev => ({ ...prev, target: 2000 }));
+                setCustomGoalInput('2000');
+                setGoalError('');
+                setShowSettingsModal(false);
+              }}
+            >
+              <Text style={styles.resetBtnText}>Reset to recommended (2000ml)</Text>
+            </TouchableOpacity>
             
             <View style={styles.modalActions}>
               <TouchableOpacity 
@@ -555,9 +592,12 @@ export default function HydrationScreen() {
                 style={[styles.modalActionBtn, { backgroundColor: '#C2A878' }]} 
                 onPress={() => {
                   const goal = parseInt(customGoalInput);
-                  if (goal > 0) {
-                    setHydration(prev => ({ ...prev, target: goal }));
+                  if (isNaN(goal) || goal < 500 || goal > 5000) {
+                    setGoalError('Daily goal must be between 500 ml and 5000 ml');
+                    return;
                   }
+                  setGoalError('');
+                  setHydration(prev => ({ ...prev, target: goal }));
                   setShowSettingsModal(false);
                 }}
               >
@@ -1002,5 +1042,26 @@ const styles = StyleSheet.create({
   modalActionBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 14
+  },
+  errorText: {
+    color: '#E11D48',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 12,
+    marginBottom: 16,
+    marginTop: -12
+  },
+  resetBtn: {
+    backgroundColor: 'rgba(194, 168, 120, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(194, 168, 120, 0.2)',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  resetBtnText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#C2A878',
+    fontSize: 12
   }
 });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal, Alert, Platform, StatusBar, Animated, Easing, ActivityIndicator, AppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal, Alert, Platform, StatusBar, Animated, Easing, ActivityIndicator, AppState, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFirestoreData } from '../hooks/useFirestoreData';
@@ -89,6 +89,37 @@ export default function FocusScreen() {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [starRating, setStarRating] = useState(5);
   const [summaryNote, setSummaryNote] = useState('');
+
+  // Custom states for XP ticker and sharing
+  const [displayedXp, setDisplayedXp] = useState(0);
+
+  useEffect(() => {
+    if (showSummaryModal) {
+      const targetXp = activeTaskId ? 35 : 20;
+      setDisplayedXp(0);
+      let current = 0;
+      const interval = setInterval(() => {
+        if (current < targetXp) {
+          current += 1;
+          setDisplayedXp(current);
+        } else {
+          clearInterval(interval);
+        }
+      }, 40);
+      return () => clearInterval(interval);
+    }
+  }, [showSummaryModal]);
+
+  const handleShareSession = async () => {
+    try {
+      const taskStr = committedIntention ? `"${committedIntention}"` : "my study goals";
+      const msg = `🔥 Just finished a 25-minute Deep Study session on ${taskStr} with only ${distractionsCount} distractions on Planory! 🚀📚`;
+      await Share.share({ message: msg });
+      Vibration.vibrate(40);
+    } catch (e) {
+      console.warn(e);
+    }
+  };
 
   // Lock Mode / Full Screen
   const [isFullScreenLock, setIsFullScreenLock] = useState(false);
@@ -892,7 +923,7 @@ export default function FocusScreen() {
                 <Text style={styles.summaryItemLabel}>DISTRACTIONS</Text>
               </View>
               <View style={styles.summaryItemCol}>
-                <Text style={[styles.summaryItemVal, { color: '#7C9B7A' }]}>+20 XP</Text>
+                <Text style={[styles.summaryItemVal, { color: '#C2A878' }]}>🪙 +{displayedXp} XP</Text>
                 <Text style={styles.summaryItemLabel}>BONUS XP</Text>
               </View>
             </View>
@@ -920,6 +951,43 @@ export default function FocusScreen() {
               onChangeText={setSummaryNote}
               multiline
             />
+
+            {/* Share & Next Actions */}
+            <View style={{ gap: 12, marginTop: 12, marginBottom: 12 }}>
+              <TouchableOpacity 
+                style={styles.shareSessionBtn} 
+                onPress={handleShareSession}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="logo-whatsapp" size={16} color="#0F1115" style={{ marginRight: 6 }} />
+                <Text style={styles.shareSessionBtnText}>Share Status on WhatsApp</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.modalSectionLabel}>Next Action Suggestions</Text>
+              <View style={styles.suggestionsRow}>
+                <TouchableOpacity 
+                  style={styles.suggestionPill} 
+                  onPress={saveSessionSummary}
+                >
+                  <Ionicons name="walk-outline" size={14} color="#7C9B7A" style={{ marginRight: 4 }} />
+                  <Text style={styles.suggestionPillText}>Stretch & Walk</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.suggestionPill}
+                  onPress={saveSessionSummary}
+                >
+                  <Ionicons name="water-outline" size={14} color="#4B6BFB" style={{ marginRight: 4 }} />
+                  <Text style={styles.suggestionPillText}>Drink Water</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.suggestionPill}
+                  onPress={saveSessionSummary}
+                >
+                  <Ionicons name="book-outline" size={14} color="#C2A878" style={{ marginRight: 4 }} />
+                  <Text style={styles.suggestionPillText}>Revise Cards</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             
             <TouchableOpacity style={styles.saveSummaryBtn} onPress={saveSessionSummary}>
               <Text style={styles.saveSummaryBtnText}>Complete & Start Break</Text>
@@ -1683,5 +1751,42 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 11,
     color: '#C2A878'
-  }
+  },
+  shareSessionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#25D366', // WhatsApp Green
+    borderRadius: 12,
+    paddingVertical: 12,
+    width: '100%',
+  },
+  shareSessionBtnText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+    color: '#0F1115',
+  },
+  suggestionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 6,
+    width: '100%',
+  },
+  suggestionPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0F1115',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 10,
+    paddingVertical: 8,
+  },
+  suggestionPillText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 10,
+    color: '#F3F1EC',
+  },
 });

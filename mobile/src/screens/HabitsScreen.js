@@ -1,5 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, StatusBar, Animated, Vibration, Modal, TextInput, Alert, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, StatusBar, Animated, Vibration, Modal, TextInput, Alert, Dimensions, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFirestoreData } from '../hooks/useFirestoreData';
@@ -8,11 +7,21 @@ import { calculateXPProgress } from '../utils/gamification';
 import { awardXP } from '../utils/xpManager';
 import XPFlyAnimation from '../components/XPFlyAnimation';
 
+import React, { useEffect, useRef, useState } from 'react';
+
 export default function HabitsScreen() {
   const userId = auth.currentUser ? auth.currentUser.uid : 'guest';
   const [hydration, setHydration] = useFirestoreData(`${userId}_hydration`, { water: 0, target: 2000 });
   const [gamification, setGamification] = useFirestoreData(`${userId}_gamification_state`, { level: 1, xp: 0 });
   const [habits, setHabits] = useFirestoreData(`${userId}_user_habits`, []);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1500);
+  };
 
   // Entrance animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -129,19 +138,79 @@ export default function HabitsScreen() {
     }));
   };
 
-  // Defensive scaling: if target is set as glasses/liters (e.g. < 50) instead of ml, scale it to ml
-  const displayTarget = hydration.target < 50 ? hydration.target * 250 : hydration.target;
+  const displayTarget = hydration.target || 2000;
   const progress = Math.min((hydration.water / displayTarget) * 100, 100);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const allCompleted = habits.length > 0 && habits.every(h => h.logs && h.logs.includes(todayStr));
+  const shimmerAnim = useRef(new Animated.Value(-150)).current;
+
+  useEffect(() => {
+    if (allCompleted) {
+      Animated.loop(
+        Animated.timing(shimmerAnim, {
+          toValue: 400,
+          duration: 2000,
+          useNativeDriver: true,
+        })
+      ).start();
+    } else {
+      shimmerAnim.setValue(-150);
+    }
+  }, [allCompleted]);
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        {allCompleted && (
+          <Animated.View 
+            style={[
+              styles.shimmerOverlay, 
+              { transform: [{ translateX: shimmerAnim }] }
+            ]} 
+          />
+        )}
         <Text style={styles.headerTitle}>Habits</Text>
       </View>
       
       <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-        <ScrollView contentContainerStyle={{ padding: 24 }}>
+        <ScrollView 
+          contentContainerStyle={{ padding: 24 }}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh} 
+              colors={['#C2A878']} 
+              tintColor="#C2A878" 
+            />
+          }
+        >
         
+        {/* Daily Habits Progress Bar */}
+        {habits.length > 0 && (
+          <View style={styles.habitsProgressContainer}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={styles.progressLabel}>HABITS PROGRESS TODAY</Text>
+              <Text style={styles.progressValueText}>
+                {habits.filter(h => h.logs && h.logs.includes(new Date().toISOString().split('T')[0])).length} of {habits.length} done
+              </Text>
+            </View>
+            <View style={styles.progressBarBg}>
+              <View 
+                style={[
+                  styles.progressBarFill, 
+                  { 
+                    width: `${Math.min(
+                      (habits.filter(h => h.logs && h.logs.includes(new Date().toISOString().split('T')[0])).length / habits.length) * 100, 
+                      100
+                    )}%` 
+                  }
+                ]} 
+              />
+            </View>
+          </View>
+        )}
+
         {/* Hydration Widget */}
         <TouchableOpacity style={styles.hydrationCard} onPress={addWater} activeOpacity={0.9}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -159,7 +228,7 @@ export default function HabitsScreen() {
 
         {/* Daily Habits */}
         <View style={styles.section}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <Text style={styles.sectionTitle}>DAILY HABITS</Text>
             <TouchableOpacity onPress={() => setShowAddHabit(true)} style={{ padding: 4 }}>
               <Ionicons name="add" size={20} color="#C2A878" />
@@ -190,16 +259,37 @@ export default function HabitsScreen() {
                     onLongPress={() => handleDeleteHabit(h.id)}
                     activeOpacity={0.8}
                   >
-                    <Animated.View style={[styles.checkbox, isCompleted && styles.checkboxChecked, { transform: [{ scale: checkboxScaleAnims[h.id] || 1 }] }]} />
+                    <Animated.View 
+                      style={[
+                        styles.checkbox, 
+                        isCompleted && styles.checkboxChecked, 
+                        { 
+                          transform: [{ scale: checkboxScaleAnims[h.id] || 1 }],
+                          justifyContent: 'center',
+                          alignItems: 'center'
+                        }
+                      ]}
+                    >
+                      {isCompleted && (
+                        <Ionicons name="checkmark" size={12} color="#0F1115" />
+                      )}
+                    </Animated.View>
                     <View style={styles.habitIconContainer}>
                       <Ionicons name={h.icon || 'star-outline'} size={14} color={isCompleted ? '#C2A878' : '#8B92A0'} />
                     </View>
                     <Text style={[styles.habitTitle, isCompleted && styles.habitTitleCompleted]}>
                       {h.name}
                     </Text>
-                    <View style={styles.fireBadge}>
-                      <Ionicons name="flame-outline" size={12} color="#FF8C00" style={{ marginRight: 4 }} />
-                      <Text style={styles.fireCount}>{h.fire || 0}</Text>
+                    <View style={[styles.fireBadge, (h.fire || 0) === 0 ? styles.fireBadgeInactive : styles.fireBadgeActive]}>
+                      <Ionicons 
+                        name={(h.fire || 0) === 0 ? "flame-outline" : "flame"} 
+                        size={12} 
+                        color={(h.fire || 0) === 0 ? "#5A6070" : "#FF8C00"} 
+                        style={{ marginRight: 4 }} 
+                      />
+                      <Text style={[styles.fireCount, (h.fire || 0) === 0 ? styles.fireCountInactive : styles.fireCountActive]}>
+                        {h.fire || 0}
+                      </Text>
                     </View>
                   </TouchableOpacity>
                 </Animated.View>
@@ -283,8 +373,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F1115',
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0
   },
-  header: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 8 },
+  header: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 8, position: 'relative', overflow: 'hidden' },
   headerTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 28, color: '#F3F1EC' },
+  shimmerOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 80,
+    backgroundColor: 'rgba(194, 168, 120, 0.22)',
+    transform: [{ skewX: '-25deg' }],
+  },
   
   hydrationCard: { 
     backgroundColor: '#171B22', 
@@ -323,7 +421,7 @@ const styles = StyleSheet.create({
   addWaterText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: '#5A6070', letterSpacing: 1 },
 
   section: { marginBottom: 24 },
-  sectionTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: '#5A6070', letterSpacing: 1 },
+  sectionTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: '#5A6070', letterSpacing: 1.5, textTransform: 'uppercase' },
   
   habitCard: { 
     flexDirection: 'row', 
@@ -340,13 +438,48 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2
   },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', marginRight: 16, backgroundColor: '#0F1115' },
+  checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', marginRight: 16, backgroundColor: '#0F1115' },
   checkboxChecked: { backgroundColor: '#C2A878', borderColor: '#C2A878' },
   habitTitle: { flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, color: '#F3F1EC' },
   habitTitleCompleted: { color: '#8B92A0', textDecorationLine: 'line-through' },
   
-  fireBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 69, 0, 0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  fireCount: { fontFamily: 'PlusJakartaSans_700Bold', color: '#FF8C00', fontSize: 12 },
+  fireBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  fireBadgeActive: { backgroundColor: 'rgba(255, 140, 0, 0.1)' },
+  fireBadgeInactive: { backgroundColor: 'rgba(90, 96, 112, 0.1)' },
+  fireCount: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12 },
+  fireCountActive: { color: '#FF8C00' },
+  fireCountInactive: { color: '#5A6070' },
+  
+  habitsProgressContainer: {
+    backgroundColor: '#171B22',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  progressLabel: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10,
+    color: '#8B92A0',
+    letterSpacing: 1.2,
+  },
+  progressValueText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    color: '#C2A878',
+  },
+  progressBarBg: {
+    height: 6,
+    backgroundColor: '#0F1115',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#C2A878',
+    borderRadius: 3,
+  },
   habitIconContainer: { width: 24, height: 24, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
 
   modalOverlay: {

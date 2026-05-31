@@ -13,7 +13,8 @@ import {
   Vibration, 
   Share, 
   PanResponder, 
-  Dimensions 
+  Dimensions,
+  Platform 
 } from 'react-native';
 
 import DashboardScreen from '../screens/DashboardScreen';
@@ -32,16 +33,16 @@ const { width } = Dimensions.get('window');
 
 // SwipeWrapper component to intercept swipes and navigate between tabs
 function SwipeWrapper({ children, navigation, route }) {
-  const tabNames = ['Home', 'Habits', 'Notes', 'Timer', 'Schedule'];
+  const tabNames = ['Home', 'Habits', 'Timer', 'Schedule'];
   const currentIndex = tabNames.indexOf(route.name);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Set pan responder if horizontal movement is larger than vertical movement
-        // and has moved at least 40 pixels horizontally
-        return Math.abs(gestureState.dx) > 40 && Math.abs(gestureState.dy) < 20;
+        // Smooth swipe recognition: triggers when horizontal movement is larger than vertical
+        // and exceeds a threshold (30px)
+        return Math.abs(gestureState.dx) > 30 && Math.abs(gestureState.dy) < 60 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
       },
       onPanResponderRelease: (evt, gestureState) => {
         if (gestureState.dx > 45) {
@@ -198,10 +199,11 @@ export default function TabNavigator() {
 
   const handleAddNote = () => {
     if (!noteContent.trim()) return;
+    const autoTitle = noteContent.trim().split('\n')[0].substring(0, 40).trim() || 'Untitled Note';
     const newNote = {
       id: Date.now().toString(),
       subject: noteSubject.trim() || 'General',
-      title: noteTitle.trim() || 'Quick Note',
+      title: noteTitle.trim() || autoTitle,
       text: noteContent.trim(),
       date: new Date().toISOString()
     };
@@ -229,14 +231,15 @@ export default function TabNavigator() {
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: false,
+          animation: 'fade',
           tabBarStyle: {
             backgroundColor: '#171B22',
             borderTopColor: 'rgba(255,255,255,0.03)',
             borderTopWidth: 1,
             elevation: 8,
-            height: 65,
-            paddingBottom: 10,
-            paddingTop: 10,
+            height: Platform.OS === 'ios' ? 88 : 72,
+            paddingBottom: Platform.OS === 'ios' ? 24 : 12,
+            paddingTop: 8,
             shadowColor: '#000',
             shadowOffset: { width: 0, height: -4 },
             shadowOpacity: 0.1,
@@ -244,6 +247,7 @@ export default function TabNavigator() {
           },
           tabBarActiveTintColor: '#C2A878',
           tabBarInactiveTintColor: '#5A6070',
+          tabBarShowLabel: true,
           tabBarIcon: ({ focused, color }) => {
             let iconName;
             if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
@@ -253,27 +257,29 @@ export default function TabNavigator() {
             else if (route.name === 'Schedule') iconName = focused ? 'calendar' : 'calendar-outline';
 
             return (
-              <View style={{ alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                {focused && (
-                  <View 
-                    style={{ 
-                      width: 18, 
-                      height: 3, 
-                      borderRadius: 1.5, 
-                      backgroundColor: '#C2A878', 
-                      position: 'absolute', 
-                      top: -6 
-                    }} 
-                  />
-                )}
-                <Ionicons name={iconName} size={22} color={color} />
+              <View 
+                style={[
+                  { 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    width: 50,
+                    height: 30,
+                    borderRadius: 15,
+                  },
+                  focused && {
+                    backgroundColor: 'rgba(194, 168, 120, 0.15)',
+                  }
+                ]}
+              >
+                <Ionicons name={iconName} size={20} color={color} />
               </View>
             );
           },
           tabBarLabelStyle: {
             fontFamily: 'PlusJakartaSans_600SemiBold',
             fontSize: 10,
-            marginTop: 2,
+            marginTop: 4,
+            marginBottom: Platform.OS === 'ios' ? 0 : 4,
           }
         })}
       >
@@ -291,13 +297,7 @@ export default function TabNavigator() {
             </SwipeWrapper>
           )}
         </Tab.Screen>
-        <Tab.Screen name="Notes">
-          {props => (
-            <SwipeWrapper {...props}>
-              <NotesScreen />
-            </SwipeWrapper>
-          )}
-        </Tab.Screen>
+
         <Tab.Screen name="Timer">
           {props => (
             <SwipeWrapper {...props}>

@@ -11,7 +11,9 @@ import {
   StatusBar, 
   Animated, 
   Vibration,
-  Share
+  Share,
+  RefreshControl,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,12 +37,20 @@ export default function DashboardScreen() {
   const userId = auth.currentUser ? auth.currentUser.uid : 'guest';
   const emailPrefix = auth.currentUser?.email ? auth.currentUser.email.split('@')[0] : 'Student';
 
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1500);
+  };
+
   // Core Firestore States
   const [profile, setProfile] = useFirestoreData(`${userId}_user_profile`, { name: emailPrefix, bio: 'Builder', avatar: null });
   const [gamification, setGamification] = useFirestoreData(`${userId}_gamification_state`, { level: 1, xp: 0 });
   const [tasks, setTasks] = useFirestoreData(`${userId}_tasks`, []);
   const [hydration, setHydration] = useFirestoreData(`${userId}_hydration`, { water: 0, target: 8 });
-  const [pomodoroStats] = useFirestoreData(`${userId}_pomodoro_stats`, { roundsToday: 0, date: new Date().toISOString().split('T')[0] });
+  const [pomodoroStats, setPomodoroStats] = useFirestoreData(`${userId}_pomodoro_stats`, { roundsToday: 0, date: new Date().toISOString().split('T')[0] });
   
   // New Layout & Feature states
   const [timetable] = useFirestoreData(`${userId}_timetable`, { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] });
@@ -104,6 +114,66 @@ export default function DashboardScreen() {
 
   const [showKickoffModal, setShowKickoffModal] = useState(false);
   const xpFlyRef = useRef(null);
+
+  // Collapsed widgets state
+  const [collapsedWidgets, setCollapsedWidgets] = useState({});
+  // Tooltip sequence step (0: hidden, 1: Focus Timer, 2: Habits, 3: Water)
+  const [tooltipStep, setTooltipStep] = useState(0);
+
+  useEffect(() => {
+    // Load collapsed widgets
+    AsyncStorage.getItem('dashboard_collapsed_widgets').then(val => {
+      if (val) setCollapsedWidgets(JSON.parse(val));
+    });
+
+    // Load tooltip status
+    AsyncStorage.getItem('has_seen_tooltip_guide').then(val => {
+      if (!val) {
+        setTooltipStep(1);
+      }
+    });
+
+    // Trigger confetti if onboarding was just completed
+    AsyncStorage.getItem('onboarding_just_completed').then(val => {
+      if (val === 'true') {
+        setTimeout(() => {
+          if (confettiRef.current) {
+            confettiRef.current.startBurst();
+          }
+        }, 1000);
+        AsyncStorage.removeItem('onboarding_just_completed');
+      }
+    });
+  }, []);
+
+  const toggleWidgetCollapse = async (id) => {
+    const next = { ...collapsedWidgets, [id]: !collapsedWidgets[id] };
+    setCollapsedWidgets(next);
+    await AsyncStorage.setItem('dashboard_collapsed_widgets', JSON.stringify(next));
+  };
+
+  const handleNextTooltip = async () => {
+    if (tooltipStep < 3) {
+      setTooltipStep(tooltipStep + 1);
+    } else {
+      setTooltipStep(0);
+      await AsyncStorage.setItem('has_seen_tooltip_guide', 'true');
+    }
+  };
+
+  const renderWidgetHeader = (widgetId, title) => {
+    const isCollapsed = collapsedWidgets[widgetId];
+    return (
+      <TouchableOpacity 
+        style={styles.collapsibleWidgetHeader} 
+        onPress={() => toggleWidgetCollapse(widgetId)}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <Ionicons name={isCollapsed ? "chevron-down" : "chevron-up"} size={16} color="#5A6070" />
+      </TouchableOpacity>
+    );
+  };
 
   // Dashboard entrance animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -392,7 +462,7 @@ export default function DashboardScreen() {
 
     const taskGoalMet = tasks.filter(t => t.date === todayStr && t.completed).length >= 3;
     const focusGoalMet = pomodoroStats.roundsToday >= 2;
-    const waterGoalMet = hydration.water >= (hydration.target < 50 ? 6 : 1500);
+    const waterGoalMet = hydration.water >= 1500;
 
     checkStreak('tasks', taskGoalMet);
     checkStreak('focus', focusGoalMet);
@@ -407,14 +477,82 @@ export default function DashboardScreen() {
   const todayTasks = tasks.filter(t => t.date === todayStr);
   const completedTodayTasks = todayTasks.filter(t => t.completed).length;
 
-  const questWaterGoal = hydration.target < 50 ? 6 : 1500;
-  const currentWaterAmount = hydration.target < 50 ? hydration.water : (hydration.water < 50 ? hydration.water * 250 : hydration.water);
+  const questWaterGoal = 1500;
+  const currentWaterAmount = hydration.water;
 
   const questWaterMet = currentWaterAmount >= questWaterGoal;
   const questFocusMet = pomodoroStats.roundsToday >= 2;
   const questTasksMet = completedTodayTasks >= 3;
 
   const allQuestsCompleted = questWaterMet && questFocusMet && questTasksMet;
+
+  const handleTapHydrationQuest = () => {
+    Alert.alert(
+      "Daily Hydration Quest",
+      `Progress: ${currentWaterAmount}ml / ${questWaterGoal}ml.\n\nWhat would you like to do?`,
+      [
+        { text: "Go to Water Log", onPress: () => navigation.navigate('HydrationWorkspace') },
+        { text: "Log +250ml Water", onPress: () => {
+          const nextWater = currentWaterAmount + 250;
+          setHydration({ ...hydration, water: nextWater });
+          Vibration.vibrate(40);
+          Alert.alert("Success", "Logged 250ml water!");
+        }},
+        { text: "Cancel", style: "cancel" }
+      ]
+    );
+  };
+
+  const handleTapFocusQuest = () => {
+    Alert.alert(
+      "Daily Focus Quest",
+      `Progress: ${pomodoroStats.roundsToday || 0} / 2 Pomodoro rounds.\n\nWhat would you like to do?`,
+      [
+        { text: "Go to Focus Timer", onPress: () => navigation.navigate('Timer') },
+        { text: "Log +1 Pomodoro Round", onPress: () => {
+          const nextRounds = (pomodoroStats.roundsToday || 0) + 1;
+          setPomodoroStats({
+            ...pomodoroStats,
+            roundsToday: nextRounds,
+            date: todayStr
+          });
+          Vibration.vibrate(40);
+          Alert.alert("Success", "Logged 1 focus round!");
+        }},
+        { text: "Cancel", style: "cancel" }
+      ]
+    );
+  };
+
+  const handleTapTasksQuest = () => {
+    Alert.alert(
+      "Daily Tasks Quest",
+      `Progress: ${completedTodayTasks} / 3 tasks completed.\n\nWhat would you like to do?`,
+      [
+        { text: "Go to Tasks / Schedule", onPress: () => navigation.navigate('Schedule') },
+        { text: "Complete Next Task", onPress: () => {
+          const uncompleted = todayTasks.find(t => !t.completed);
+          if (uncompleted) {
+            const updated = tasks.map(t => t.id === uncompleted.id ? { ...t, completed: true } : t);
+            setTasks(updated);
+            Vibration.vibrate(40);
+            Alert.alert("Success", `Marked "${uncompleted.text}" as completed!`);
+          } else {
+            const nextTask = {
+              id: Date.now().toString(),
+              text: "Quick Daily Quest Task",
+              completed: true,
+              date: todayStr
+            };
+            setTasks([...tasks, nextTask]);
+            Vibration.vibrate(40);
+            Alert.alert("Success", "Added and completed a quick task!");
+          }
+        }},
+        { text: "Cancel", style: "cancel" }
+      ]
+    );
+  };
 
   // Claim Daily Quest complete reward
   useEffect(() => {
@@ -728,7 +866,7 @@ export default function DashboardScreen() {
               <Text style={styles.briefingStatLabel}>PENDING</Text>
             </View>
             <View style={styles.briefingStatItem}>
-              <Text style={styles.briefingStatVal}>{hydration.target < 50 ? hydration.target : 8} glasses</Text>
+              <Text style={styles.briefingStatVal}>{hydration.target || 2000} ml</Text>
               <Text style={styles.briefingStatLabel}>DAILY WATER</Text>
             </View>
             <View style={styles.briefingStatItem}>
@@ -748,7 +886,7 @@ export default function DashboardScreen() {
       const todayName = weekdays[new Date().getDay()];
       const todayClasses = timetable && timetable[todayName] ? timetable[todayName] : [];
       const nextClassText = todayClasses.length > 0 ? `${todayClasses[0].subject} at ${todayClasses[0].time.split(' - ')[0]}` : "No classes today!";
-      const displayTarget = hydration.target < 50 ? hydration.target * 250 : hydration.target;
+      const displayTarget = hydration.target || 2000;
 
       return (
         <View style={styles.briefingCard}>
@@ -896,7 +1034,7 @@ export default function DashboardScreen() {
       return {
         icon: 'book-outline',
         text: 'All tasks completed! Revise your whiteboard scanned notes.',
-        action: () => navigation.navigate('Notes'),
+        action: () => navigation.navigate('NotesWorkspace'),
         btnText: 'Read Notes',
         color: '#C2A878'
       };
@@ -969,7 +1107,17 @@ export default function DashboardScreen() {
       </View>
 
       <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-        <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 80 }}>
+        <ScrollView 
+          contentContainerStyle={{ padding: 24, paddingBottom: 80 }}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh} 
+              colors={['#C2A878']} 
+              tintColor="#C2A878" 
+            />
+          }
+        >
           
           {/* Dynamic greeting banner */}
           <View style={[styles.greetingBanner, (activeTheme.themeId === 'exams' || isExamWeek) && { borderColor: 'rgba(225, 29, 72, 0.2)' }]}>
@@ -1002,8 +1150,8 @@ export default function DashboardScreen() {
               <Ionicons name="water-outline" size={16} color="#00BFFF" />
               <Text style={styles.pulseVal}>
                 {(() => {
-                  const displayWaterTarget = hydration.target < 50 ? hydration.target * 250 : hydration.target;
-                  const displayWaterCurrent = hydration.water < 50 ? hydration.water * 250 : hydration.water;
+                  const displayWaterTarget = hydration.target || 2000;
+                  const displayWaterCurrent = hydration.water || 0;
                   return Math.round(Math.min((displayWaterCurrent / (displayWaterTarget || 2000)) * 100, 100));
                 })()}%
               </Text>
@@ -1126,9 +1274,12 @@ export default function DashboardScreen() {
               widgetContent = widget.size === 'full' ? (
                 /* Quests Full */
                 <View style={styles.sectionNoMargin}>
-                  <Text style={styles.sectionTitle}>DAILY QUESTS (XP MULTIPLIER)</Text>
                   <View style={styles.questsCard}>
-                    <View style={styles.questRow}>
+                    <TouchableOpacity 
+                      style={styles.questRow}
+                      onPress={handleTapHydrationQuest}
+                      activeOpacity={0.7}
+                    >
                       <Ionicons 
                         name={questWaterMet ? "checkmark-circle" : "ellipse-outline"} 
                         size={20} 
@@ -1138,9 +1289,13 @@ export default function DashboardScreen() {
                       <Text style={[styles.questText, questWaterMet && styles.questTextCompleted]}>
                         Log 1.5L Hydration ({currentWaterAmount}/{questWaterGoal} ml)
                       </Text>
-                    </View>
+                    </TouchableOpacity>
                     <View style={styles.questDivider} />
-                    <View style={styles.questRow}>
+                    <TouchableOpacity 
+                      style={styles.questRow}
+                      onPress={handleTapFocusQuest}
+                      activeOpacity={0.7}
+                    >
                       <Ionicons 
                         name={questFocusMet ? "checkmark-circle" : "ellipse-outline"} 
                         size={20} 
@@ -1148,11 +1303,15 @@ export default function DashboardScreen() {
                         style={{ marginRight: 12 }}
                       />
                       <Text style={[styles.questText, questFocusMet && styles.questTextCompleted]}>
-                        Complete 2 Pomodoro Rounds ({pomodoroStats.roundsToday}/2)
+                        Complete 2 Pomodoro Rounds ({(pomodoroStats.roundsToday || 0)}/2)
                       </Text>
-                    </View>
+                    </TouchableOpacity>
                     <View style={styles.questDivider} />
-                    <View style={styles.questRow}>
+                    <TouchableOpacity 
+                      style={styles.questRow}
+                      onPress={handleTapTasksQuest}
+                      activeOpacity={0.7}
+                    >
                       <Ionicons 
                         name={questTasksMet ? "checkmark-circle" : "ellipse-outline"} 
                         size={20} 
@@ -1162,7 +1321,7 @@ export default function DashboardScreen() {
                       <Text style={[styles.questText, questTasksMet && styles.questTextCompleted]}>
                         Complete 3 Scheduled Tasks ({completedTodayTasks}/3)
                       </Text>
-                    </View>
+                    </TouchableOpacity>
                   </View>
                 </View>
               ) : (
@@ -1178,7 +1337,6 @@ export default function DashboardScreen() {
               widgetContent = widget.size === 'full' ? (
                 /* Productivity Score Full */
                 <View style={styles.sectionNoMargin}>
-                  <Text style={styles.sectionTitle}>TODAY'S PRODUCTIVITY</Text>
                   <View style={styles.scoreCard}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 16 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1301,7 +1459,6 @@ export default function DashboardScreen() {
               widgetContent = widget.size === 'full' ? (
                 /* Tasks Full */
                 <View style={styles.sectionNoMargin}>
-                  <Text style={styles.sectionTitle}>TODAY'S TASKS</Text>
                   <View style={{ marginTop: 12 }}>
                     {todayTasks.length === 0 ? (
                       <View style={styles.emptyState}>
@@ -1352,7 +1509,6 @@ export default function DashboardScreen() {
               widgetContent = widget.size === 'full' ? (
                 /* Sleep Tracker Full */
                 <View style={styles.sleepTrackerFull}>
-                  <Text style={styles.sectionTitle}>SLEEP TRACKING</Text>
                   
                   <View style={styles.sleepInputRow}>
                     <View style={{ flex: 1 }}>
@@ -1441,7 +1597,6 @@ export default function DashboardScreen() {
               widgetContent = widget.size === 'full' ? (
                 /* Timetable Full */
                 <View style={styles.sleepTrackerFull}>
-                  <Text style={styles.sectionTitle}>TODAY'S CLASSES</Text>
                   {(() => {
                     const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                     const todayDay = weekdays[new Date().getDay()];
@@ -1527,7 +1682,6 @@ export default function DashboardScreen() {
             } else if (widget.id === 'heatmap') {
               widgetContent = (
                 <View style={styles.sectionNoMargin}>
-                  <Text style={styles.sectionTitle}>STUDY HEATMAP (LAST 7 DAYS)</Text>
                   <View style={styles.heatmapCard}>
                     <View style={styles.heatmapDaysRow}>
                       {(() => {
@@ -1604,7 +1758,34 @@ export default function DashboardScreen() {
               );
             }
 
-            return renderWidgetWrapper(widget, widgetContent, index);
+            let titleText = widget.title || widget.id.toUpperCase();
+            if (widget.id === 'quests') titleText = "DAILY QUESTS (XP MULTIPLIER)";
+            if (widget.id === 'productivity') titleText = "TODAY'S PRODUCTIVITY";
+            if (widget.id === 'calendar') titleText = "STUDY CALENDAR";
+            if (widget.id === 'tasks') titleText = "TODAY'S TASKS";
+            if (widget.id === 'sleep') titleText = "SLEEP TRACKING";
+            if (widget.id === 'timetable') titleText = "TODAY'S CLASSES";
+            if (widget.id === 'quote') titleText = "QUOTE OF THE DAY";
+            if (widget.id === 'heatmap') titleText = "STUDY HEATMAP (LAST 7 DAYS)";
+            if (widget.id === 'profile') titleText = "STUDENT ID PROFILE";
+
+            const isCollapsed = collapsedWidgets[widget.id];
+
+            const wrappedContent = (
+              <View style={{ marginBottom: 20 }}>
+                <TouchableOpacity 
+                  style={styles.collapsibleWidgetHeader} 
+                  onPress={() => toggleWidgetCollapse(widget.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.sectionTitle}>{titleText}</Text>
+                  <Ionicons name={isCollapsed ? "chevron-down" : "chevron-up"} size={16} color="#5A6070" />
+                </TouchableOpacity>
+                {!isCollapsed && widgetContent}
+              </View>
+            );
+
+            return renderWidgetWrapper(widget, wrappedContent, index);
           })}
 
           {/* Add Widget Button Row */}
@@ -1864,6 +2045,39 @@ export default function DashboardScreen() {
 
       {/* XP Fly-Up Animation */}
       <XPFlyAnimation ref={xpFlyRef} />
+
+      {/* Tooltip Tutorial Sequence */}
+      {tooltipStep > 0 && (
+        <View style={styles.tooltipOverlay}>
+          <View style={styles.tooltipCard}>
+            <View style={styles.tooltipHeader}>
+              <Ionicons 
+                name={
+                  tooltipStep === 1 ? "timer-outline" :
+                  tooltipStep === 2 ? "flame-outline" : "water-outline"
+                } 
+                size={28} 
+                color="#C2A878" 
+              />
+              <Text style={styles.tooltipTitle}>
+                {tooltipStep === 1 ? "1. Focus Desk Timer" :
+                 tooltipStep === 2 ? "2. Daily Habits" : "3. Hydration Log"}
+              </Text>
+            </View>
+            <Text style={styles.tooltipText}>
+              {tooltipStep === 1 ? "Commit to an intention task, play offline white noise mix, and study distraction-free. Completed sessions award XP!" :
+               tooltipStep === 2 ? "Build consistency rings by checking off your habits. Planory streak shields protect you on busy days." :
+               "Set sensible hydration targets (e.g. 2000ml) and track your daily intake easily from the Habits deck."}
+            </Text>
+            <View style={styles.tooltipActions}>
+              <Text style={styles.tooltipStepsIndicator}>{tooltipStep} of 3</Text>
+              <TouchableOpacity style={styles.tooltipNextBtn} onPress={handleNextTooltip}>
+                <Text style={styles.tooltipNextText}>{tooltipStep === 3 ? "Get Started" : "Next →"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -3179,5 +3393,72 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 10,
     color: '#5A6070'
-  }
+  },
+  // Tooltip Styles
+  tooltipOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(9, 11, 15, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+    padding: 24,
+  },
+  tooltipCard: {
+    backgroundColor: '#171B22',
+    borderWidth: 1.5,
+    borderColor: '#C2A878',
+    borderRadius: 24,
+    padding: 24,
+    width: '90%',
+    shadowColor: '#C2A878',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  tooltipHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  tooltipTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 18,
+    color: '#F3F1EC',
+  },
+  tooltipText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 13,
+    color: '#8B92A0',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  tooltipActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  tooltipStepsIndicator: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#5A6070',
+    fontSize: 12,
+  },
+  tooltipNextBtn: {
+    backgroundColor: '#C2A878',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  tooltipNextText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F1115',
+    fontSize: 13,
+  },
+  collapsibleWidgetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
 });

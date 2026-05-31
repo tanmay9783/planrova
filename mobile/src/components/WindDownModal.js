@@ -22,7 +22,7 @@ export default function WindDownModal({
   setTasks, 
   timetable, 
   userId,
-  hydration = { water: 0, target: 8 },
+  hydration = { water: 0, target: 2000 },
   habits = [],
   pomodoroStats = { roundsToday: 0 },
   expenses = []
@@ -164,8 +164,8 @@ export default function WindDownModal({
   const focusHours = Math.floor((focusRounds * 25) / 60);
   const focusMinutes = (focusRounds * 25) % 60;
 
-  const displayWaterTarget = hydration?.target < 50 ? hydration.target * 250 : (hydration?.target || 2000);
-  const displayWaterCurrent = hydration?.water < 50 ? hydration.water * 250 : (hydration?.water || 0);
+  const displayWaterTarget = hydration?.target || 2000;
+  const displayWaterCurrent = hydration?.water || 0;
 
   const totalHabitsCount = habits?.length || 0;
   const completedHabitsCount = habits ? habits.filter(h => h.logs && h.logs.includes(todayStr)).length : 0;

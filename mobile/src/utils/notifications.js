@@ -57,6 +57,8 @@ export async function scheduleWaterReminders() {
       data: { type: 'water' },
     },
     trigger: {
+      type: 'timeInterval',
+      channelId: 'default',
       seconds: 7200, // 2 hours
       repeats: true,
     },
@@ -79,9 +81,10 @@ export async function scheduleHabitNudges() {
       data: { type: 'habits' },
     },
     trigger: {
+      type: 'daily',
+      channelId: 'default',
       hour: 18,
       minute: 0,
-      repeats: true,
     },
   });
 }
@@ -102,9 +105,10 @@ export async function scheduleFocusReminders() {
       data: { type: 'focus' },
     },
     trigger: {
+      type: 'daily',
+      channelId: 'default',
       hour: 10,
       minute: 0,
-      repeats: true,
     },
   });
 }
@@ -124,9 +128,10 @@ export async function scheduleDailyTaskReminders() {
       data: { type: 'tasks' },
     },
     trigger: {
+      type: 'daily',
+      channelId: 'default',
       hour: 9,
       minute: 0,
-      repeats: true,
     },
   });
 }
@@ -153,6 +158,8 @@ export async function schedulePomodoroNotification(mode, secondsRemaining) {
       sound: true,
     },
     trigger: {
+      type: 'timeInterval',
+      channelId: 'default',
       seconds: secondsRemaining,
     },
   });
@@ -173,9 +180,10 @@ export async function scheduleWindDownNudges() {
       data: { type: 'winddown' },
     },
     trigger: {
+      type: 'daily',
+      channelId: 'default',
       hour: 21,
       minute: 0,
-      repeats: true,
     },
   });
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, StatusBar, Modal, TextInput, Animated, Vibration, Alert, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, StatusBar, Modal, TextInput, Animated, Vibration, Alert, ActivityIndicator, Linking, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFirestoreData } from '../hooks/useFirestoreData';
@@ -8,6 +8,7 @@ import { calculateXPProgress } from '../utils/gamification';
 import { awardXP } from '../utils/xpManager';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { callOcrProxy } from '../config/api';
 
 export default function ScheduleScreen() {
   const userId = auth.currentUser ? auth.currentUser.uid : 'guest';
@@ -16,9 +17,18 @@ export default function ScheduleScreen() {
   const [expenses] = useFirestoreData(`${userId}_expenses`, []);
   const [habits] = useFirestoreData(`${userId}_user_habits`, []);
   const [gamification, setGamification] = useFirestoreData(`${userId}_gamification_state`, { level: 1, xp: 0 });
+  const [timetable] = useFirestoreData(`${userId}_timetable`, { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] });
   
   // Segment view control: 'weekly' or 'semester'
   const [scheduleView, setScheduleView] = useState('weekly');
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1500);
+  };
   
   // Semester Planner States
   const [semesterDates, setSemesterDates] = useFirestoreData(`${userId}_semester_dates`, { 
@@ -60,22 +70,10 @@ export default function ScheduleScreen() {
   const [importStep, setImportStep] = useState(0); // 1-4
   const [showImportReview, setShowImportReview] = useState(false);
   const [importedEvents, setImportedEvents] = useState([]);
+  const [scanError, setScanError] = useState(null);
+  const [lastBase64, setLastBase64] = useState(null);
   const importBeamAnim = useRef(new Animated.Value(0)).current;
 
-  // Groq API Key State
-  const DEFAULT_GROQ_KEY = '';
-  const [groqKey, setGroqKey] = useState(DEFAULT_GROQ_KEY);
-
-  useEffect(() => {
-    AsyncStorage.getItem('groq_api_key').then(val => {
-      if (val) setGroqKey(val);
-    });
-  }, []);
-
-  const handleSaveGroqKey = async (val) => {
-    setGroqKey(val);
-    await AsyncStorage.setItem('groq_api_key', val);
-  };
 
   const [activeDate, setActiveDate] = useState(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -151,6 +149,64 @@ export default function ScheduleScreen() {
     return dates;
   };
 
+  const getTomorrowDayName = () => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return days[tomorrow.getDay()];
+  };
+
+  const getTimetableRecommendation = () => {
+    if (!timetable) return null;
+    const tomorrowDay = getTomorrowDayName();
+    const tomorrowClasses = timetable[tomorrowDay] || [];
+    
+    if (tomorrowClasses.length > 0) {
+      const firstClass = tomorrowClasses[0];
+      const className = firstClass.subject || firstClass.name || 'lecture';
+      return {
+        text: `Your ${className} starts tomorrow — add revision session?`,
+        class: className,
+        day: tomorrowDay
+      };
+    }
+    
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const todayDay = days[new Date().getDay()];
+    const todayClasses = timetable[todayDay] || [];
+    if (todayClasses.length > 0) {
+      const firstClass = todayClasses[0];
+      const className = firstClass.subject || firstClass.name || 'lecture';
+      return {
+        text: `You had ${className} today — add revision or homework check?`,
+        class: className,
+        day: todayDay
+      };
+    }
+    return null;
+  };
+
+  const handleTapRecommendation = (rec) => {
+    const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split('T')[0];
+    const targetDate = rec.day === getTomorrowDayName() ? tomorrowStr : todayStr;
+    setActiveDate(targetDate);
+    setNewTaskText(`Revise ${rec.class}`);
+  };
+
+  const getEmptyDayMessage = (dayName) => {
+    switch (dayName) {
+      case 'Monday': return "Fresh week energy! Add your first lecture task.";
+      case 'Tuesday': return "Midweek momentum! What are we study-grinding today?";
+      case 'Wednesday': return "Halfway through! Keep the study engine warm.";
+      case 'Thursday': return "Finish line in sight. Solve some questions!";
+      case 'Friday': return "Almost weekend! Plan your revision early.";
+      case 'Saturday': return "Weekend prep! Finish backlogs & assignments.";
+      case 'Sunday': return "Rest day — focus on simple habits & recovery.";
+      default: return "No tasks today! Add a study target to begin.";
+    }
+  };
+
   const weekDates = getWeekDates();
   
   const renderDayCard = (dateObj) => {
@@ -178,11 +234,14 @@ export default function ScheduleScreen() {
         <View style={styles.tasksContainer}>
           {dayTasks.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="sparkles-outline" size={14} color="#5A6070" style={{ marginBottom: 4 }} />
-              <Text style={styles.emptyText}>Clear schedule</Text>
-              <View style={styles.emptyAddBtn}>
+              <Ionicons name="sparkles-outline" size={14} color="#C2A878" style={{ marginBottom: 4 }} />
+              <Text style={styles.emptyText}>{getEmptyDayMessage(dayName)}</Text>
+              <TouchableOpacity 
+                style={styles.emptyAddBtn} 
+                onPress={() => setActiveDate(dayStr)}
+              >
                 <Text style={styles.emptyAddBtnText}>+ Add Task</Text>
-              </View>
+              </TouchableOpacity>
             </View>
           ) : (
             dayTasks.map(task => (
@@ -352,6 +411,9 @@ export default function ScheduleScreen() {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const base64 = result.assets[0].base64;
+        setLastBase64(base64);
+        setScanError(null);
+        setShowImportModal(true);
         runCalendarOcr(base64);
       }
     } catch (e) {
@@ -359,12 +421,12 @@ export default function ScheduleScreen() {
       runCalendarOcr(null);
     }
   };
-
   const runCalendarOcr = async (base64Data) => {
     setIsImporting(true);
     setImportStep(1);
-    
-    // Start scan loop
+    setScanError(null);
+
+    // Start scan beam animation
     importBeamAnim.setValue(0);
     Animated.loop(
       Animated.sequence([
@@ -376,53 +438,26 @@ export default function ScheduleScreen() {
     const step2Timer = setTimeout(() => setImportStep(2), 800);
     const step3Timer = setTimeout(() => setImportStep(3), 1600);
 
-    const useMockFallback = () => {
-      clearTimeout(step2Timer);
-      clearTimeout(step3Timer);
-      setImportStep(4);
-      setImportedEvents([
-        { id: 'imp-1', title: 'Mid-Term Exams', type: 'exam', date: '2026-06-05' },
-        { id: 'imp-2', title: 'Class Project Submission', type: 'internal', date: '2026-06-10' },
-        { id: 'imp-3', title: 'Term Holiday', type: 'holiday', date: '2026-06-25' }
-      ]);
-      setIsImporting(false);
-      setShowImportReview(true);
-    };
-
     if (!base64Data) {
-      Alert.alert(
-        'No Image Selected',
-        'Tap "Choose Calendar Photo" or "Snap Photo" to provide a calendar image for real AI extraction.',
-        [{ text: 'OK' }]
-      );
-      setTimeout(useMockFallback, 2400);
+      setIsImporting(false);
+      setImportStep(0);
+      setScanError('read_failed');
       return;
     }
 
-    const activeKey = groqKey || DEFAULT_GROQ_KEY;
-
-    try {
-      const response = await fetch(
-        'https://api.groq.com/openai/v1/chat/completions',
+    const calendarPayload = {
+      model: 'llama-3.2-11b-vision-preview',
+      messages: [
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${activeKey}`
-          },
-          body: JSON.stringify({
-            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are an expert academic calendar OCR assistant. Your job is to read academic calendars, extract EVERY SINGLE EVENT listed, and also detect the overall semester/term bounds and final/end-term exams period. You must be exhaustive and return a JSON object with this details.'
-              },
-              {
-                role: 'user',
-                content: [
-                  {
-                    type: 'text',
-                    text: `You are given an image of an academic calendar. Your task is to extract EVERY event listed in the ENTIRE calendar — do not skip or summarize. Read every row, every column, every month block carefully.
+          role: 'system',
+          content: 'You are an expert academic calendar OCR assistant. Your job is to read academic calendars, extract EVERY SINGLE EVENT listed, and also detect the overall semester/term bounds and final/end-term exams period. You must be exhaustive and return a JSON object with this details.'
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `You are given an image of an academic calendar. Your task is to extract EVERY event listed in the ENTIRE calendar — do not skip or summarize. Read every row, every column, every month block carefully.
                     
                     Additionally, identify the overall date range for the Semester/Term (start and end) and the overall date range for the End-Semester/Final Exams block (examStart and examEnd).
                     
@@ -443,28 +478,23 @@ export default function ScheduleScreen() {
                         { "id": "e-1", "title": "Exact Event Name From Calendar", "type": "exam", "date": "2026-06-05" }
                       ]
                     }`
-                  },
-                  {
-                    type: 'image_url',
-                    image_url: {
-                      url: `data:image/jpeg;base64,${base64Data}`
-                    }
-                  }
-                ]
-              }
-            ],
-            max_tokens: 4096,
-            temperature: 0.05
-          })
+            },
+            {
+              type: 'image_url',
+              image_url: { url: `data:image/jpeg;base64,${base64Data}` }
+            }
+          ]
         }
-      );
+      ],
+      max_tokens: 4096,
+      temperature: 0.05
+    };
 
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(`Groq API error ${response.status}: ${errJson?.error?.message || 'Unknown error'}`);
-      }
-
-      const resJson = await response.json();
+    // All OCR requests go through the server proxy (cloud or local)
+    // Key is stored ONLY on the server — never in the app
+    try {
+      const proxyResponse = await callOcrProxy(calendarPayload, 'calendar');
+      const resJson = await proxyResponse.json();
       const textResult = resJson.choices?.[0]?.message?.content || '';
 
       const cleanJsonStr = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -473,11 +503,10 @@ export default function ScheduleScreen() {
       clearTimeout(step2Timer);
       clearTimeout(step3Timer);
       setImportStep(4);
-      
+
       const extractedEvents = parsedData.events || (Array.isArray(parsedData) ? parsedData : []);
       setImportedEvents(extractedEvents);
 
-      // prefect dates if extracted
       if (parsedData.semesterStart || parsedData.examStart) {
         setSemesterDates({
           start: parsedData.semesterStart || semesterDates.start,
@@ -489,14 +518,19 @@ export default function ScheduleScreen() {
 
       setIsImporting(false);
       setShowImportReview(true);
+      setScanError(null);
     } catch (e) {
-      console.warn('Calendar Groq scan failed, using fallback:', e);
-      Alert.alert(
-        'AI Scan Failed',
-        `Could not extract events from image: ${e.message}. Showing sample data.`,
-        [{ text: 'OK' }]
-      );
-      useMockFallback();
+      console.error('Calendar OCR failed:', e);
+      clearTimeout(step2Timer);
+      clearTimeout(step3Timer);
+      setIsImporting(false);
+      if (e.message.includes('503') || e.message.includes('key not configured')) {
+        setScanError('unavailable');
+      } else if (e.message.toLowerCase().includes('network') || e.message.toLowerCase().includes('proxy') || e.message.toLowerCase().includes('unreachable')) {
+        setScanError('network_error');
+      } else {
+        setScanError('read_failed');
+      }
     }
   };
 
@@ -544,7 +578,41 @@ export default function ScheduleScreen() {
 
       {scheduleView === 'weekly' ? (
         <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent}>
+          <ScrollView 
+            style={{ flex: 1 }} 
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={onRefresh} 
+                colors={['#C2A878']} 
+                tintColor="#C2A878" 
+              />
+            }
+          >
+            {/* Timetable Smart Suggestion Banner */}
+            {(() => {
+              const rec = getTimetableRecommendation();
+              if (!rec) return null;
+              return (
+                <TouchableOpacity 
+                  style={styles.suggestionBanner} 
+                  onPress={() => handleTapRecommendation(rec)}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                    <View style={styles.suggestionIconBg}>
+                      <Ionicons name="bulb-outline" size={16} color="#C2A878" />
+                    </View>
+                    <Text style={styles.suggestionText} numberOfLines={1}>{rec.text}</Text>
+                  </View>
+                  <View style={styles.suggestionActionBtn}>
+                    <Text style={styles.suggestionActionText}>+ Add</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })()}
+
             <View style={styles.gridContainer}>
               <View style={styles.column}>
                 {leftColDays.map(renderDayCard)}
@@ -583,7 +651,17 @@ export default function ScheduleScreen() {
         </Animated.View>
       ) : (
         /* Semester Planner View */
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }}>
+        <ScrollView 
+          contentContainerStyle={{ padding: 16, paddingBottom: 80 }}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh} 
+              colors={['#C2A878']} 
+              tintColor="#C2A878" 
+            />
+          }
+        >
           
           {/* Weeks remaining counter */}
           <View style={styles.countdownCard}>
@@ -668,7 +746,22 @@ export default function ScheduleScreen() {
               <Ionicons name="add" size={16} color="#0F1115" style={{ marginRight: 6 }} />
               <Text style={styles.addEventBtnText}>Add Event</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.importCalendarBtn} onPress={() => setShowImportModal(true)}>
+            <TouchableOpacity 
+              style={styles.importCalendarBtn} 
+              onPress={() => {
+                setScanError(null);
+                setLastBase64(null);
+                Alert.alert(
+                  "AI Calendar Import",
+                  "Choose a source to import your academic calendar:",
+                  [
+                    { text: "Choose from Gallery", onPress: () => handleLaunchImportCalendar(false) },
+                    { text: "Snap Photo", onPress: () => handleLaunchImportCalendar(true) },
+                    { text: "Cancel", style: "cancel" }
+                  ]
+                );
+              }}
+            >
               <Ionicons name="sparkles" size={14} color="#C2A878" style={{ marginRight: 6 }} />
               <Text style={styles.importCalendarBtnText}>AI Calendar Import</Text>
             </TouchableOpacity>
@@ -829,11 +922,8 @@ export default function ScheduleScreen() {
                 <Ionicons name="close" size={24} color="#8B92A0" />
               </TouchableOpacity>
             </View>
-
-            {!isImporting && !showImportReview && (
+                {!isImporting && !showImportReview && !scanError && (
               <View style={{ gap: 16 }}>
-                <Text style={styles.modalSubtitle}>AI reads your academic calendar and auto-fills exams, tests, events, and holidays.</Text>
-
                 {/* 4MB size tip */}
                 <View style={styles.aiTipBanner}>
                   <Ionicons name="information-circle-outline" size={16} color="#C2A878" style={{ marginRight: 8, marginTop: 1 }} />
@@ -870,6 +960,41 @@ export default function ScheduleScreen() {
                   }}
                 >
                   <Text style={[styles.primaryBtnText, { color: '#0F1115' }]}>Extract from URL</Text>
+                </TouchableOpacity>
+
+                {/* AI Powered note (no key needed — handled server-side) */}
+                <View style={{ width: '100%', borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginTop: 8, paddingTop: 10 }}>
+                  <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10, color: '#5A6070', textAlign: 'center' }}>
+                    ✦ Powered by Groq AI Vision · No setup needed
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {scanError && (
+              <View style={styles.scanningProgressContainer}>
+                <Ionicons name="alert-circle-outline" size={48} color="#C47070" style={{ marginBottom: 12 }} />
+                <Text style={[styles.scanningStatusTitle, { textAlign: 'center', marginHorizontal: 16 }]}>
+                  {scanError === 'unavailable' 
+                    ? "Scan unavailable right now — try again later" 
+                    : scanError === 'network_error'
+                    ? "Groq Connection Failed: SSL/Network certification issue. Please verify internet access."
+                    : "Could not read image. Try again?"}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { backgroundColor: '#C2A878', width: '100%', marginTop: 16 }]}
+                  onPress={() => runCalendarOcr(lastBase64)}
+                >
+                  <Text style={[styles.primaryBtnText, { color: '#0F1115' }]}>Retry Scan</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { backgroundColor: '#171B22', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', width: '100%', marginTop: 8 }]}
+                  onPress={() => {
+                    setScanError(null);
+                    setLastBase64(null);
+                  }}
+                >
+                  <Text style={[styles.primaryBtnText, { color: '#8B92A0' }]}>Choose Another</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -937,7 +1062,7 @@ export default function ScheduleScreen() {
                   style={[styles.primaryBtn, { backgroundColor: '#C2A878', marginTop: 16 }]} 
                   onPress={handleConfirmImport}
                 >
-                  <Text style={{ color: '#0F1115', fontFamily: 'PlusJakartaSans_700Bold' }}>Confirm & Import Events</Text>
+                  <Text style={{ color: '#0F1115', fontFamily: 'PlusJakartaSans_700Bold' }}>Add to Schedule</Text>
                 </TouchableOpacity>
               </ScrollView>
             )}
@@ -1646,5 +1771,42 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 9,
     color: '#C2A878'
+  },
+  suggestionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(194, 168, 120, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(194, 168, 120, 0.15)',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
+    justifyContent: 'space-between'
+  },
+  suggestionIconBg: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(194, 168, 120, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10
+  },
+  suggestionText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 12,
+    color: '#F3F1EC',
+    flex: 1
+  },
+  suggestionActionBtn: {
+    backgroundColor: '#C2A878',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8
+  },
+  suggestionActionText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10,
+    color: '#0F1115'
   }
 });

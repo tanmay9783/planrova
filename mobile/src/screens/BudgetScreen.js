@@ -302,7 +302,12 @@ export default function BudgetScreen() {
 
           {/* 1-Tap Shortcuts */}
           <Text style={styles.sectionTitle}>1-TAP SHORTCUTS</Text>
-          <View style={styles.presetsContainer}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.presetsScrollContent} 
+            style={styles.presetsScrollView}
+          >
             {BUDGET_PRESETS.map((preset, idx) => (
               <TouchableOpacity
                 key={idx}
@@ -317,7 +322,7 @@ export default function BudgetScreen() {
                 <Text style={styles.presetPriceText}>₹{preset.amount}</Text>
               </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
 
           {/* Action Row */}
           <View style={styles.actionsRow}>
@@ -383,27 +388,42 @@ export default function BudgetScreen() {
           {/* Spending Breakdown */}
           <Text style={styles.sectionTitle}>SPENDING BREAKDOWN</Text>
           <View style={styles.breakdownCard}>
-            {Object.keys(categoryTotals).map(cat => {
-              const total = categoryTotals[cat];
-              const pct = totalSpent > 0 ? (total / totalSpent) * 100 : 0;
-              let barColor = '#8B92A0';
-              if (cat === 'Food') barColor = '#C2A878';
-              else if (cat === 'Transport') barColor = '#4B6BFB';
-              else if (cat === 'Books') barColor = '#7C9B7A';
-              else if (cat === 'Fun') barColor = '#C47070';
-              
+            {(() => {
+              const allCategories = Object.keys(categoryTotals);
+              const activeCategories = allCategories.filter(cat => categoryTotals[cat] > 0);
+              const zeroCategoriesCount = allCategories.length - activeCategories.length;
+
               return (
-                <View key={cat} style={styles.breakdownRow}>
-                  <View style={styles.breakdownTextRow}>
-                    <Text style={styles.breakdownName}>{cat}</Text>
-                    <Text style={styles.breakdownVal}>₹{total} <Text style={styles.breakdownValPct}>({Math.round(pct)}%)</Text></Text>
-                  </View>
-                  <View style={styles.breakdownBarBg}>
-                    <View style={[styles.breakdownBarFill, { width: `${pct}%`, backgroundColor: barColor }]} />
-                  </View>
-                </View>
+                <>
+                  {activeCategories.map(cat => {
+                    const total = categoryTotals[cat];
+                    const pct = totalSpent > 0 ? (total / totalSpent) * 100 : 0;
+                    let barColor = '#8B92A0';
+                    if (cat === 'Food') barColor = '#C2A878';
+                    else if (cat === 'Transport') barColor = '#4B6BFB';
+                    else if (cat === 'Books') barColor = '#7C9B7A';
+                    else if (cat === 'Fun') barColor = '#C47070';
+                    
+                    return (
+                      <View key={cat} style={styles.breakdownRow}>
+                        <View style={styles.breakdownTextRow}>
+                          <Text style={styles.breakdownName}>{cat}</Text>
+                          <Text style={styles.breakdownVal}>₹{total} <Text style={styles.breakdownValPct}>({Math.round(pct)}%)</Text></Text>
+                        </View>
+                        <View style={styles.breakdownBarBg}>
+                          <View style={[styles.breakdownBarFill, { width: `${pct}%`, backgroundColor: barColor }]} />
+                        </View>
+                      </View>
+                    );
+                  })}
+                  {zeroCategoriesCount > 0 && (
+                    <Text style={styles.hiddenCategoriesText}>
+                      + {zeroCategoriesCount} empty categories
+                    </Text>
+                  )}
+                </>
               );
-            })}
+            })()}
           </View>
 
           {/* Recent Expenses */}
@@ -437,7 +457,7 @@ export default function BudgetScreen() {
                     <Ionicons name={itemIcon} size={16} color={iconColor} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.expenseItemDesc}>{e.desc}</Text>
+                    <Text style={styles.expenseItemDesc} numberOfLines={1} ellipsizeMode="tail">{e.desc}</Text>
                     <Text style={styles.expenseItemMeta}>{e.category || 'Misc'} • {new Date(e.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
                   </View>
                   <Text style={styles.expenseItemAmt}>-₹{e.amount}</Text>
@@ -728,19 +748,20 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textTransform: 'uppercase'
   },
-  presetsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
+  presetsScrollView: {
     marginBottom: 16
   },
+  presetsScrollContent: {
+    gap: 10,
+    paddingRight: 16
+  },
   presetButton: {
-    flex: 1,
+    width: 105,
     backgroundColor: '#171B22',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.03)',
     borderRadius: 14,
-    padding: 10,
+    padding: 12,
     alignItems: 'center'
   },
   presetIconContainer: {
@@ -898,6 +919,15 @@ const styles = StyleSheet.create({
   breakdownBarFill: {
     height: '100%',
     borderRadius: 2
+  },
+  hiddenCategoriesText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 9,
+    color: '#5A6070',
+    textAlign: 'center',
+    marginTop: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5
   },
   emptyCard: {
     backgroundColor: '#171B22',

@@ -26,3 +26,8 @@ dist-ssr
 # Planory local database
 data/
 *.db
+
+# Environment variables — API keys must never be committed
+.env
+.env.*
+!.env.example

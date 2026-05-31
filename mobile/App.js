@@ -75,16 +75,17 @@ export default function App() {
   const [obBranch, setObBranch] = useState('');
   const [obSemester, setObSemester] = useState('');
   const [obHabits, setObHabits] = useState([
-    { name: 'Drink 3L Water', icon: 'water-outline', selected: true },
-    { name: 'Read 10 Pages', icon: 'book-outline', selected: true },
-    { name: 'Work out', icon: 'barbell-outline', selected: false },
+    { name: 'Gym', icon: 'barbell-outline', selected: true },
+    { name: 'Read', icon: 'book-outline', selected: true },
     { name: 'Meditate', icon: 'body-outline', selected: false },
-    { name: 'Pray / Namaz', icon: 'sunny-outline', selected: false },
-    { name: 'Write Journal', icon: 'create-outline', selected: false },
-    { name: 'Code / LeetCode', icon: 'code-slash-outline', selected: true }
+    { name: 'Code', icon: 'code-slash-outline', selected: true },
+    { name: 'Namaz', icon: 'sunny-outline', selected: false },
+    { name: 'Journal', icon: 'create-outline', selected: false },
+    { name: 'Study', icon: 'school-outline', selected: true },
+    { name: 'Wake early', icon: 'alarm-outline', selected: false }
   ]);
   const [obStudyHours, setObStudyHours] = useState('4');
-  const [obWaterTarget, setObWaterTarget] = useState('8');
+  const [obWaterTarget, setObWaterTarget] = useState('2000');
   const [obPocketLimit, setObPocketLimit] = useState('5000');
 
   // Onboarding Timetable States
@@ -100,6 +101,8 @@ export default function App() {
   const [timetableImage, setTimetableImage] = useState(null);
   const [isScanningTimetable, setIsScanningTimetable] = useState(false);
   const [timetableScanStep, setTimetableScanStep] = useState(0); // 0: idle, 1: reading, 2: OCR, 3: matching, 4: complete
+  const [scanError, setScanError] = useState(null);
+  const [lastBase64, setLastBase64] = useState(null);
   const [showTimetableReview, setShowTimetableReview] = useState(false);
   const scanBarAnim = useRef(new Animated.Value(0)).current;
 
@@ -140,12 +143,16 @@ export default function App() {
         const uri = result.assets[0].uri;
         const base64 = result.assets[0].base64;
         setTimetableImage(uri);
+        setLastBase64(base64);
+        setScanError(null);
         runTimetableScan(base64);
       }
     } catch (e) {
       console.warn(e);
       // Fallback simulation
       setTimetableImage('simulated_timetable.png');
+      setLastBase64(null);
+      setScanError(null);
       runTimetableScan(null);
     }
   };
@@ -153,6 +160,7 @@ export default function App() {
   const runTimetableScan = async (base64Data) => {
     setIsScanningTimetable(true);
     setTimetableScanStep(1);
+    setScanError(null);
     
     // Start scan beam looping animation
     scanBarAnim.setValue(0);
@@ -204,28 +212,21 @@ export default function App() {
     };
 
     if (!base64Data) {
-      Alert.alert(
-        'No Image Selected',
-        'Please take or choose a photo of your timetable to enable real AI scanning.',
-        [{ text: 'OK' }]
-      );
-      setTimeout(useMockFallback, 2400);
+      setIsScanningTimetable(false);
+      setTimetableScanStep(0);
+      setScanError('read_failed');
       return;
     }
 
     if (!groqKey) {
-      Alert.alert(
-        'Groq API Key Required',
-        'To use AI timetable scanning, paste your free Groq API key in the field below. Get one at console.groq.com',
-        [{ text: 'OK', onPress: useMockFallback }]
-      );
+      setTimeout(useMockFallback, 2400);
       return;
     }
 
     const activeKey = groqKey;
 
-    try {
-      const response = await fetch(
+    const makeRequest = async () => {
+      return await fetch(
         'https://api.groq.com/openai/v1/chat/completions',
         {
           method: 'POST',
@@ -234,7 +235,7 @@ export default function App() {
             'Authorization': `Bearer ${activeKey}`
           },
           body: JSON.stringify({
-            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+            model: 'llama-3.2-11b-vision-preview',
             messages: [{
               role: 'user',
               content: [
@@ -255,6 +256,14 @@ export default function App() {
           })
         }
       );
+    };
+
+    try {
+      let response = await makeRequest();
+      if (!response.ok && (response.status === 404 || response.status === 503)) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        response = await makeRequest();
+      }
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
@@ -264,7 +273,6 @@ export default function App() {
       const resJson = await response.json();
       const textResult = resJson.choices?.[0]?.message?.content || '';
 
-      // Clean up the text (remove triple backticks or json prefix if any)
       const cleanJsonStr = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsedData = JSON.parse(cleanJsonStr);
 
@@ -274,14 +282,19 @@ export default function App() {
       setObTimetable(parsedData);
       setIsScanningTimetable(false);
       setShowTimetableReview(true);
+      setScanError(null);
     } catch (e) {
-      console.warn('Groq AI Timetable Scan failed, using simulator fallback:', e);
-      Alert.alert(
-        'AI Scan Failed',
-        `Could not extract from image: ${e.message}. Falling back to sample data.`,
-        [{ text: 'OK' }]
-      );
-      useMockFallback();
+      console.error('Groq AI Timetable Scan failed:', e);
+      clearTimeout(step2Timer);
+      clearTimeout(step3Timer);
+      setIsScanningTimetable(false);
+      if (e.message.includes('404') || e.message.includes('503')) {
+        setScanError('unavailable');
+      } else if (e.message.toLowerCase().includes('network') || e.message.toLowerCase().includes('cert')) {
+        setScanError('network_error');
+      } else {
+        setScanError('read_failed');
+      }
     }
   };
 
@@ -668,7 +681,7 @@ export default function App() {
       const hydrationRef = doc(db, 'users', userId, 'appData', `${userId}_hydration`);
       await setDoc(hydrationRef, {
         id: `${userId}_hydration`,
-        value: JSON.stringify({ water: 0, target: parseInt(obWaterTarget) || 8 }),
+        value: JSON.stringify({ water: 0, target: parseInt(obWaterTarget) || 2000 }),
         updated_at: Date.now(),
         deleted: false
       }, { merge: true });
@@ -891,7 +904,6 @@ export default function App() {
             <View style={[styles.obDot, obStep >= 1 && styles.obDotActive]} />
             <View style={[styles.obDot, obStep >= 2 && styles.obDotActive]} />
             <View style={[styles.obDot, obStep >= 3 && styles.obDotActive]} />
-            <View style={[styles.obDot, obStep >= 4 && styles.obDotActive]} />
           </View>
         </View>
 
@@ -982,7 +994,7 @@ export default function App() {
                   <Text style={styles.obSecondaryBtnText}>← Back</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.obPrimaryBtn, { flex: 1 }]} onPress={() => handleOnboardingNext(3)}>
-                  <Text style={styles.obPrimaryBtnText}>Next: Timetable →</Text>
+                  <Text style={styles.obPrimaryBtnText}>Next: Targets →</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -990,125 +1002,11 @@ export default function App() {
 
           {obStep === 3 && (
             <ScrollView contentContainerStyle={styles.obContent}>
-              <Text style={styles.obTitle}>Scan Your Timetable</Text>
-              <Text style={styles.obSubtitle}>Snap or upload a photo of your timetable to auto-fill your week. Or skip to set manually.</Text>
-
-
-
-              {!showTimetableReview && !isScanningTimetable ? (
-                <View style={styles.scannerUploadBox}>
-                  <Ionicons name="camera-outline" size={48} color="#C2A878" style={{ marginBottom: 16 }} />
-                  <TouchableOpacity style={styles.scanBtnOption} onPress={() => handleSelectTimetable(true)}>
-                    <Ionicons name="camera" size={16} color="#0F1115" style={{ marginRight: 6 }} />
-                    <Text style={styles.scanBtnOptionText}>Snap Photo</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.scanBtnOption, { backgroundColor: '#171B22', borderColor: 'rgba(255,255,255,0.06)', borderWidth: 1 }]} onPress={() => handleSelectTimetable(false)}>
-                    <Ionicons name="images" size={16} color="#C2A878" style={{ marginRight: 6 }} />
-                    <Text style={[styles.scanBtnOptionText, { color: '#C2A878' }]}>Choose from Gallery</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={{ marginTop: 12 }} onPress={() => handleOnboardingNext(4)}>
-                    <Text style={{ color: '#8B92A0', fontSize: 13, textDecorationLine: 'underline', fontFamily: 'PlusJakartaSans_500Medium' }}>Skip & Set Later</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-
-              {isScanningTimetable ? (
-                <View style={styles.scanningProgressContainer}>
-                  <View style={styles.imageOverlayContainer}>
-                    <Ionicons name="document-text-outline" size={32} color="#C2A878" style={{ marginBottom: 8 }} />
-                    <Animated.View style={[styles.scanBeamLine, { transform: [{ translateY: scanBarAnim }] }]} />
-                  </View>
-                  <Text style={styles.scanningStatusTitle}>AI OCR Timetable Scanning...</Text>
-                  <View style={styles.scanningStepLogs}>
-                    <Text style={[styles.scanStepLogText, timetableScanStep >= 1 && styles.scanStepLogTextActive]}>
-                      {timetableScanStep >= 1 ? '✅' : '⏳'} Initializing Claude Vision Parser...
-                    </Text>
-                    <Text style={[styles.scanStepLogText, timetableScanStep >= 2 && styles.scanStepLogTextActive]}>
-                      {timetableScanStep >= 2 ? '✅' : '⏳'} Detecting calendar cells and grids...
-                    </Text>
-                    <Text style={[styles.scanStepLogText, timetableScanStep >= 3 && styles.scanStepLogTextActive]}>
-                      {timetableScanStep >= 3 ? '✅' : '⏳'} Extracting subjects, room codes & times...
-                    </Text>
-                    <Text style={[styles.scanStepLogText, timetableScanStep >= 4 && styles.scanStepLogTextActive]}>
-                      {timetableScanStep >= 4 ? '✅' : '⏳'} Auto-repeat timetable aligned!
-                    </Text>
-                  </View>
-                  <ActivityIndicator size="small" color="#C2A878" style={{ marginTop: 16 }} />
-                </View>
-              ) : null}
-
-              {showTimetableReview ? (
-                <View style={{ marginTop: 12 }}>
-                  <Text style={[styles.obLabel, { color: '#C2A878', marginBottom: 16 }]}>AI Extracted Timetable (Manual Review)</Text>
-                  {Object.keys(obTimetable).map((day) => {
-                    const classes = obTimetable[day];
-                    if (day === 'Saturday' || day === 'Sunday') return null; // keep onboarding review simple
-                    return (
-                      <View key={day} style={styles.reviewDaySection}>
-                        <View style={styles.reviewDayHeader}>
-                          <Text style={styles.reviewDayTitle}>{day}</Text>
-                          <TouchableOpacity style={styles.addSlotBtn} onPress={() => addTimetableClass(day)}>
-                            <Ionicons name="add" size={14} color="#C2A878" style={{ marginRight: 2 }} />
-                            <Text style={styles.addSlotBtnText}>Class</Text>
-                          </TouchableOpacity>
-                        </View>
-                        {classes.length === 0 ? (
-                          <Text style={styles.emptyDayReview}>No classes scanned for {day}</Text>
-                        ) : (
-                          classes.map((cls) => (
-                            <View key={cls.id} style={styles.reviewClassCard}>
-                              <TextInput
-                                style={[styles.reviewClassInput, { flex: 2 }]}
-                                value={cls.subject}
-                                onChangeText={(val) => updateTimetableField(day, cls.id, 'subject', val)}
-                                placeholder="Subject name..."
-                                placeholderTextColor="#5A6070"
-                              />
-                              <TextInput
-                                style={[styles.reviewClassInput, { flex: 2 }]}
-                                value={cls.time}
-                                onChangeText={(val) => updateTimetableField(day, cls.id, 'time', val)}
-                                placeholder="Time slot..."
-                                placeholderTextColor="#5A6070"
-                              />
-                              <TextInput
-                                style={[styles.reviewClassInput, { flex: 1.2 }]}
-                                value={cls.room}
-                                onChangeText={(val) => updateTimetableField(day, cls.id, 'room', val)}
-                                placeholder="Room..."
-                                placeholderTextColor="#5A6070"
-                              />
-                              <TouchableOpacity style={styles.deleteClassBtn} onPress={() => deleteTimetableClass(day, cls.id)}>
-                                <Ionicons name="trash" size={14} color="#C47070" />
-                              </TouchableOpacity>
-                            </View>
-                          ))
-                        )}
-                      </View>
-                    );
-                  })}
-
-                  <TouchableOpacity style={[styles.obPrimaryBtn, { backgroundColor: '#C2A878', marginTop: 24 }]} onPress={() => handleOnboardingNext(4)}>
-                    <Text style={[styles.obPrimaryBtnText, { color: '#0F1115' }]}>Confirm Timetable & Next →</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-
-              {!showTimetableReview && !isScanningTimetable ? (
-                <View style={styles.obButtonRow}>
-                  <TouchableOpacity style={styles.obSecondaryBtn} onPress={() => handleOnboardingNext(2)}>
-                    <Text style={styles.obSecondaryBtnText}>← Back</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-            </ScrollView>
-          )}
-
-          {obStep === 4 && (
-            <ScrollView contentContainerStyle={styles.obContent}>
               <Text style={styles.obTitle}>Set Daily Targets</Text>
               <Text style={styles.obSubtitle}>Set focus study hours, hydration objectives, and pocket budget parameters.</Text>
-              
+
+
+
               <View style={styles.obInputGroup}>
                 <Text style={styles.obLabel}>Daily Study Goal (Hours)</Text>
                 <TextInput 
@@ -1122,19 +1020,22 @@ export default function App() {
               </View>
 
               <View style={styles.obInputGroup}>
-                <Text style={styles.obLabel}>Daily Water Target (Glasses)</Text>
-                <TextInput 
-                  style={styles.obInput}
-                  value={obWaterTarget}
-                  onChangeText={setObWaterTarget}
-                  keyboardType="numeric"
-                  placeholder="8"
-                  placeholderTextColor="#5A6070"
-                />
+                <Text style={styles.obLabel}>Daily Water Target (ml)</Text>
+                <View style={styles.waterQuickSelector}>
+                  {[1000, 2000, 3000, 4000, 5000].map(val => (
+                    <TouchableOpacity 
+                      key={val} 
+                      style={[styles.waterSelectorPill, obWaterTarget === val.toString() && styles.waterSelectorPillActive]}
+                      onPress={() => setObWaterTarget(val.toString())}
+                    >
+                      <Text style={[styles.waterSelectorPillText, obWaterTarget === val.toString() && { color: '#0F1115' }]}>{val}ml</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
               <View style={styles.obInputGroup}>
-                <Text style={styles.obLabel}>Monthly Pocket Money Limit (₹)</Text>
+                <Text style={styles.obLabel}>Optional Monthly Pocket Money Limit (₹)</Text>
                 <TextInput 
                   style={styles.obInput}
                   value={obPocketLimit}
@@ -1146,7 +1047,7 @@ export default function App() {
               </View>
 
               <View style={styles.obButtonRow}>
-                <TouchableOpacity style={styles.obSecondaryBtn} onPress={() => handleOnboardingNext(3)}>
+                <TouchableOpacity style={styles.obSecondaryBtn} onPress={() => handleOnboardingNext(2)}>
                   <Text style={styles.obSecondaryBtnText}>← Back</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.obPrimaryBtn, { flex: 1, backgroundColor: '#C2A878' }]} onPress={handleCompleteOnboarding}>
@@ -1761,5 +1662,32 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 12,
     color: '#7C9B7A',
+  },
+  waterQuickSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  waterSelectorPill: {
+    flex: 1,
+    minWidth: 70,
+    backgroundColor: '#171B22',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waterSelectorPillActive: {
+    backgroundColor: '#C2A878',
+    borderColor: '#C2A878',
+  },
+  waterSelectorPillText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 12,
+    color: '#F3F1EC',
   },
 });
