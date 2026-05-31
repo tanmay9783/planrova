@@ -81,6 +81,28 @@ function groqRequest(payload) {
   });
 }
 
+function groqGetModels() {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'api.groq.com',
+      path: '/openai/v1/models',
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${GROQ_KEY}`,
+      },
+    };
+
+    const req = https.request(options, (groqRes) => {
+      let data = '';
+      groqRes.on('data', (chunk) => { data += chunk; });
+      groqRes.on('end', () => resolve({ status: groqRes.statusCode, body: data }));
+    });
+
+    req.on('error', reject);
+    req.end();
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
@@ -95,9 +117,20 @@ const server = http.createServer(async (req, res) => {
 
   // Health check
   if (req.method === 'GET' && req.url === '/api/health') {
+    let models = [];
+    try {
+      if (GROQ_KEY && GROQ_KEY !== 'your_groq_api_key_here') {
+        const resModels = await groqGetModels();
+        const parsed = parseJSON(resModels.body);
+        models = parsed?.data?.map(m => m.id) || [];
+      }
+    } catch (err) {
+      console.error('[Health] Failed to load models:', err.message);
+    }
     return sendJSON(res, 200, {
       status: 'ok',
       keyLoaded: !!GROQ_KEY && GROQ_KEY !== 'your_groq_api_key_here',
+      models,
       timestamp: Date.now()
     });
   }
