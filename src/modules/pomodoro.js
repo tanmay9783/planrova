@@ -50,16 +50,10 @@ function updatePomoUI() {
       treeStatusEl.textContent = 'Resting';
       treeEmojiEl.style.transform = 'scale(1.1)';
     } else {
-      if (!isRunning) {
-        if (secondsRemaining === 1500) {
-          treeEmojiEl.textContent = '🤎';
-          treeStatusEl.textContent = 'Planted';
-          treeEmojiEl.style.transform = 'scale(1)';
-        } else {
-          treeEmojiEl.textContent = '🪵';
-          treeStatusEl.textContent = 'Withered';
-          treeEmojiEl.style.transform = 'scale(0.9)';
-        }
+      if (secondsRemaining === 1500) {
+        treeEmojiEl.textContent = '🤎';
+        treeStatusEl.textContent = 'Planted';
+        treeEmojiEl.style.transform = 'scale(1)';
       } else {
         const elapsedPct = ((1500 - secondsRemaining) / 1500) * 100;
         let emoji = '🤎';
@@ -90,6 +84,10 @@ function updatePomoUI() {
           emoji = '🌸';
           status = 'Blossoming';
           scale = 1.25;
+        }
+        
+        if (!isRunning) {
+          status += ' (Paused)';
         }
         
         treeEmojiEl.textContent = emoji;
@@ -233,7 +231,7 @@ function pauseTimer() {
 }
 
 function resetTimer() {
-  if (isRunning && mode === 'work' && secondsRemaining < 1500) {
+  if (mode === 'work' && secondsRemaining < 1500) {
     const forest = getStorageItem('pomo_forest', []);
     forest.push('🪵');
     setStorageItem('pomo_forest', forest);
