@@ -600,7 +600,23 @@ export function addForestGrowth(pct) {
       forest.push(selectedSeed);
       setStorageItem('pomo_forest', forest);
       
-      triggerConfettiCelebration();
+      const celebrationOverlay = document.getElementById('forest-celebration-overlay');
+      const celebrationImg = document.getElementById('celebration-forest-image');
+      const celebrationMsg = document.getElementById('celebration-message');
+      
+      if (celebrationOverlay && celebrationImg && celebrationMsg) {
+        celebrationImg.innerHTML = getTreeSVG(selectedSeed, 120);
+        celebrationMsg.textContent = `You have successfully grown a mature ${selectedSeed.toUpperCase()} tree in your Focus Forest!`;
+        celebrationOverlay.classList.remove('hidden');
+        
+        triggerConfettiCelebration();
+        setTimeout(triggerConfettiCelebration, 600);
+        setTimeout(triggerConfettiCelebration, 1200);
+        
+        setTimeout(() => {
+          celebrationOverlay.classList.add('hidden');
+        }, 5000);
+      }
       
       progress = 0;
       showPomoToast(`Your plant fully blossomed into a ${selectedSeed.toUpperCase()} tree!`);

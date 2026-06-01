@@ -866,7 +866,7 @@
         
         <div style="flex: 1; overflow-y: auto; max-height: 50vh; padding-right: 8px;">
           <!-- 1. Account Panel -->
-          <div class="settings-panel active" id="panel-account" style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="settings-panel active" id="panel-account" style="flex-direction: column; gap: 16px;">
             <h3>Account Profile</h3>
             <div class="form-group">
               <label>Name</label>
@@ -894,7 +894,7 @@
           </div>
           
           <!-- 2. Appearance Panel -->
-          <div class="settings-panel" id="panel-appearance" style="display: none; flex-direction: column; gap: 16px;">
+          <div class="settings-panel" id="panel-appearance" style="flex-direction: column; gap: 16px;">
             <h3>Appearance</h3>
             <div class="setting-row" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
               <label style="text-transform: none; font-size: 13px; font-weight: 500;">Dark Theme Mode</label>
@@ -939,7 +939,7 @@
           </div>
           
           <!-- 3. Study Preferences Panel -->
-          <div class="settings-panel" id="panel-study-pref" style="display: none; flex-direction: column; gap: 16px;">
+          <div class="settings-panel" id="panel-study-pref" style="flex-direction: column; gap: 16px;">
             <h3>Study Preferences</h3>
             <div class="form-group">
               <label>Default Session Length (mins)</label>
@@ -966,7 +966,7 @@
           </div>
           
           <!-- 4. Notifications Panel -->
-          <div class="settings-panel" id="panel-notifications" style="display: none; flex-direction: column; gap: 16px;">
+          <div class="settings-panel" id="panel-notifications" style="flex-direction: column; gap: 16px;">
             <h3>Notifications Alerts</h3>
             <div style="display: flex; flex-direction: column; gap: 12px;">
               <div class="setting-row" style="display: flex; justify-content: space-between; align-items: center;">
@@ -994,7 +994,7 @@
           </div>
           
           <!-- 5. Data & Privacy Panel -->
-          <div class="settings-panel" id="panel-data-manage" style="display: none; flex-direction: column; gap: 16px;">
+          <div class="settings-panel" id="panel-data-manage" style="flex-direction: column; gap: 16px;">
             <h3>Data Management & Privacy</h3>
             <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Planory stores all your tasks, habits, hydration logs, and notes locally. You can export or clear your database at any time.</p>
             <div style="display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
@@ -1217,28 +1217,84 @@
     <span id="notif-msg"></span>
   </div>
 
-  <!-- Auth Modal -->
-  <div class="modal-overlay hidden" id="auth-modal-overlay" style="z-index: 2000;">
-    <div class="modal" style="width: 360px;">
-      <div class="modal-header">
-        <h2>Cloud Sync</h2>
-        <button class="modal-close" id="auth-close-btn">×</button>
+  <!-- Forest Completion Celebration Overlay -->
+  <div id="forest-celebration-overlay" class="hidden">
+    <div>
+      <div id="celebration-forest-image">
+        <!-- Will be populated dynamically with the grown tree SVG -->
       </div>
-      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
-        <p class="helper-text" style="margin-bottom: 8px;">Sign in to sync your data securely across all devices.</p>
-        <div class="input-group">
-          <label>Email</label>
-          <input type="email" id="auth-email" placeholder="you@example.com" />
+      <h1>Congratulations!</h1>
+      <p id="celebration-message"></p>
+    </div>
+  </div>
+
+  <!-- Welcome Landing Page Animation Overlay -->
+  <div id="welcome-loader-overlay" class="hidden">
+    <div style="text-align: center; display: flex; flex-direction: column; align-items: center; gap: 20px;">
+      <div class="welcome-ring-glow">
+        <svg viewBox="0 0 32 32" width="32" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M16 2L29 9.5V22.5L16 30L3 22.5V9.5L16 2Z" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
+          <path d="M16 8L24 12.5V21.5L16 26L8 21.5V12.5L16 8Z" fill="rgba(194,168,120,0.08)"/>
+        </svg>
+      </div>
+      <h1 id="welcome-user-name">Welcome back</h1>
+      <p style="font-size: 12px; color: var(--text-secondary); margin: 0; letter-spacing: 0.05em; text-transform: uppercase;">Syncing your workspace...</p>
+    </div>
+  </div>
+
+  <!-- Redesigned Premium Auth Card -->
+  <div class="modal-overlay hidden" id="auth-modal-overlay">
+    <div class="auth-card" id="auth-card">
+      <!-- Close button (will be hidden if logged out completely) -->
+      <button class="modal-close" id="auth-close-btn" style="position: absolute; top: 16px; right: 16px; font-size: 20px;">×</button>
+      
+      <!-- Brand Logo / Header -->
+      <div style="text-align: center; margin-bottom: 8px;">
+        <div style="font-size: 32px; font-weight: 800; color: var(--accent); font-family: var(--font-display); letter-spacing: -0.02em;">
+          <svg viewBox="0 0 32 32" width="32" height="32" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 8px;">
+            <path d="M16 2L29 9.5V22.5L16 30L3 22.5V9.5L16 2Z" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
+            <path d="M16 8L24 12.5V21.5L16 26L8 21.5V12.5L16 8Z" fill="rgba(194,168,120,0.08)"/>
+          </svg>Planory
         </div>
-        <div class="input-group">
-          <label>Password</label>
+        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Your second brain & weekly focus space</p>
+      </div>
+
+      <!-- Mode Selector (Capsule Tab Switcher) -->
+      <div id="auth-mode-selector" class="auth-toggle-capsule">
+        <button id="auth-tab-login" class="active">Log In</button>
+        <button id="auth-tab-signup">Sign Up</button>
+      </div>
+
+      <!-- Form Inputs Group -->
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <!-- Email field -->
+        <div class="form-group" id="auth-email-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin:0;">Email Address</label>
+          <input type="email" id="auth-email" placeholder="name@example.com" />
+        </div>
+
+        <!-- Password field -->
+        <div class="form-group" id="auth-password-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.05em; margin:0;">Password</label>
+            <button id="auth-forgot-link" type="button">Forgot?</button>
+          </div>
           <input type="password" id="auth-password" placeholder="••••••••" />
         </div>
-        <div id="auth-error-msg" style="color: var(--color-high); font-size: 12px; display: none;"></div>
-        <div style="display: flex; gap: 12px; margin-top: 8px;">
-          <button class="btn-primary full-width" id="auth-login-submit">Log In</button>
-          <button class="btn-ghost full-width" id="auth-signup-submit">Sign Up</button>
-        </div>
+      </div>
+
+      <!-- Forgot Password Mode Information -->
+      <div id="auth-forgot-info" class="hidden" style="display: none; font-size: 12px; color: var(--text-secondary); line-height: 1.5; text-align: center;">
+        We will send a password reset link to your email address above.
+      </div>
+
+      <!-- Error feedback -->
+      <div id="auth-error-msg" style="color: #f87171; font-size: 12px; text-align: center; display: none; background: rgba(248,113,113,0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(248,113,113,0.15);"></div>
+
+      <!-- Primary & Switcher Action Buttons -->
+      <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+        <button class="btn-primary full-width" id="auth-primary-submit">Log In</button>
+        <button class="btn-ghost full-width hidden" id="auth-back-to-login" type="button">Back to Log In</button>
       </div>
     </div>
   </div>
