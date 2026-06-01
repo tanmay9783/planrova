@@ -484,7 +484,7 @@ function setupKeyboardShortcuts() {
 
 function syncMobileDashboard() {
   const levelState = getStorageItem('gamification', { level: 1, xp: 0, tasksCompletedToday: 0, waterLoggedToday: 0 });
-  const waterState = getStorageItem('hydration', { loggedToday: 0, goal: 2000 });
+  const waterSettings = getStorageItem('hydration_settings', { goal: 2000 });
   
   const mobLevel = document.getElementById('mobile-level-display');
   const mobXp = document.getElementById('mobile-xp-display');
@@ -492,6 +492,7 @@ function syncMobileDashboard() {
   const mobWaterVol = document.getElementById('mobile-water-volume');
   const mobWaterPct = document.getElementById('mobile-water-pct');
   const mobScoreLetter = document.getElementById('mobile-score-letter');
+  const mobPetEmoji = document.getElementById('mobile-pet-emoji');
   
   const levelDisplay = document.getElementById('level-display');
   if (mobLevel && levelDisplay) mobLevel.textContent = levelDisplay.textContent;
@@ -503,13 +504,29 @@ function syncMobileDashboard() {
   if (mobStreak && streakEl) mobStreak.textContent = streakEl.textContent;
   
   // water
-  const waterVolume = levelState.waterLoggedToday ? levelState.waterLoggedToday * 250 : 0;
-  const waterGoal = waterState.goal || 2000;
-  const pct = Math.round((waterVolume / waterGoal) * 100);
+  const logs = getStorageItem('hydration_logs', []);
+  const d = new Date();
+  const year = d.getFullYear();
+  let month = '' + (d.getMonth() + 1);
+  let day = '' + d.getDate();
+  if (month.length < 2) month = '0' + month;
+  if (day.length < 2) day = '0' + day;
+  const todayStr = [year, month, day].join('-');
+  const todayLogs = logs.filter(l => l.date === todayStr);
+  const waterVolume = todayLogs.reduce((sum, l) => sum + parseInt(l.amount), 0);
+
+  const waterGoal = waterSettings.goal || 2000;
+  const pct = Math.min(100, Math.max(0, Math.round((waterVolume / waterGoal) * 100)));
   if (mobWaterVol) mobWaterVol.textContent = `${waterVolume} / ${waterGoal} ml`;
   if (mobWaterPct) mobWaterPct.textContent = `${pct}% complete`;
   
   // score
   const scoreLetterEl = document.getElementById('daily-score-letter');
   if (mobScoreLetter && scoreLetterEl) mobScoreLetter.textContent = `${scoreLetterEl ? scoreLetterEl.textContent : 'F'} Score`;
+  
+  // pet/plant emoji
+  const petContainer = document.getElementById('virtual-pet-container');
+  if (mobPetEmoji && petContainer) {
+    mobPetEmoji.textContent = petContainer.textContent;
+  }
 }

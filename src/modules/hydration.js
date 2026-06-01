@@ -256,53 +256,49 @@ function setupHydrationEvents() {
   if (eventsInitialized) return;
   eventsInitialized = true;
 
-  // Sidebar widget click
-  const widgetCard = document.getElementById('sidebar-water-widget-card');
-  if (widgetCard) {
-    widgetCard.addEventListener('click', () => {
+  document.body.addEventListener('click', (e) => {
+    // 1. Sidebar widget click
+    const widgetCard = e.target.closest('#sidebar-water-widget-card');
+    if (widgetCard) {
       const waterOverlay = document.getElementById('water-modal-overlay');
       if (waterOverlay) waterOverlay.classList.remove('hidden');
-    });
-  }
-  
-  const closeBtn = document.getElementById('water-modal-close-btn');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => {
+      return;
+    }
+    
+    // 2. Modal close button click
+    const closeBtn = e.target.closest('#water-modal-close-btn');
+    if (closeBtn) {
       const waterOverlay = document.getElementById('water-modal-overlay');
       if (waterOverlay) waterOverlay.classList.add('hidden');
-    });
-  }
-  
-  // Log Water presets from modal dashboard
-  document.querySelectorAll('.log-water-preset').forEach(btn => {
-    btn.addEventListener('click', () => {
-      let ml = parseInt(btn.dataset.ml);
+      return;
+    }
+    
+    // 3. Log Water presets from modal dashboard
+    const presetBtn = e.target.closest('.log-water-preset');
+    if (presetBtn) {
+      let ml = parseInt(presetBtn.dataset.ml);
       let type = ml > 0 ? "Water" : "Coffee/Tea";
       
       const settings = getStorageItem(HYDRATION_SETTINGS_KEY, defaultSettings);
       if (ml < 0 && !settings.diureticCoffee) {
-        // Option toggled off, ignore coffee deductions
-        ml = 200; // Log positive tea hydration
+        ml = 200;
         type = "Tea";
       }
-      
       logBeverage(ml, type);
-    });
-  });
-  
-  // Quick Sidebar "+ 💧" button logs standard 250ml
-  const quickWaterBtn = document.getElementById('sidebar-quick-water-btn');
-  if (quickWaterBtn) {
-    quickWaterBtn.addEventListener('click', (e) => {
+      return;
+    }
+    
+    // 4. Quick Sidebar "+ 💧" button
+    const quickWaterBtn = e.target.closest('#sidebar-quick-water-btn');
+    if (quickWaterBtn) {
       e.stopPropagation();
       logBeverage(250, "Quick Water");
-    });
-  }
-  
-  // Save settings
-  const saveWaterBtn = document.getElementById('save-water-settings-btn');
-  if (saveWaterBtn) {
-    saveWaterBtn.addEventListener('click', () => {
+      return;
+    }
+    
+    // 5. Save settings button
+    const saveWaterBtn = e.target.closest('#save-water-settings-btn');
+    if (saveWaterBtn) {
       const goalInput = document.getElementById('settings-water-goal');
       const intervalSelect = document.getElementById('settings-water-interval');
       const quietCheck = document.getElementById('settings-water-quiet');
@@ -315,7 +311,6 @@ function setupHydrationEvents() {
         
         setStorageItem(HYDRATION_SETTINGS_KEY, settings);
         
-        // Update target in daily status for mobile sync
         const dailyStatus = getStorageItem(HYDRATION_STATUS_KEY, { water: 0, target: 2000 });
         dailyStatus.target = settings.goal;
         setStorageItem(HYDRATION_STATUS_KEY, dailyStatus);
@@ -323,18 +318,19 @@ function setupHydrationEvents() {
         initHydration();
         showToast("Water settings saved! 💧");
       }
-    });
-  }
-  
+      return;
+    }
+  });
+
   // Coffee toggle changes
-  const coffeeToggle = document.getElementById('coffee-diuretic-toggle');
-  if (coffeeToggle) {
-    coffeeToggle.addEventListener('change', (e) => {
+  document.body.addEventListener('change', (e) => {
+    const coffeeToggle = e.target.closest('#coffee-diuretic-toggle');
+    if (coffeeToggle) {
       const settings = getStorageItem(HYDRATION_SETTINGS_KEY, defaultSettings);
-      settings.diureticCoffee = e.target.checked;
+      settings.diureticCoffee = coffeeToggle.checked;
       setStorageItem(HYDRATION_SETTINGS_KEY, settings);
-    });
-  }
+    }
+  });
 }
 
 import { addXP, logDailyActivity } from './gamification.js';

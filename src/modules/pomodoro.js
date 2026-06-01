@@ -18,6 +18,7 @@ export function initPomodoro() {
   updatePomoUI();
   updateStatsUI(stats);
   setupPomoEvents(stats);
+  renderForestGarden();
 }
 
 function updatePomoUI() {
@@ -39,6 +40,64 @@ function updatePomoUI() {
 
   // Task selection
   document.getElementById('pomo-task-label').textContent = activeTaskId ? `Focusing: ${activeTaskTitle}` : 'Ready for another focused session?';
+
+  // Update Forest tree growth stages
+  const treeEmojiEl = document.getElementById('pomo-tree-emoji');
+  const treeStatusEl = document.getElementById('pomo-tree-status');
+  if (treeEmojiEl && treeStatusEl) {
+    if (mode === 'break') {
+      treeEmojiEl.textContent = '🌺';
+      treeStatusEl.textContent = 'Resting';
+      treeEmojiEl.style.transform = 'scale(1.1)';
+    } else {
+      if (!isRunning) {
+        if (secondsRemaining === 1500) {
+          treeEmojiEl.textContent = '🤎';
+          treeStatusEl.textContent = 'Planted';
+          treeEmojiEl.style.transform = 'scale(1)';
+        } else {
+          treeEmojiEl.textContent = '🪵';
+          treeStatusEl.textContent = 'Withered';
+          treeEmojiEl.style.transform = 'scale(0.9)';
+        }
+      } else {
+        const elapsedPct = ((1500 - secondsRemaining) / 1500) * 100;
+        let emoji = '🤎';
+        let status = 'Planted';
+        let scale = 1;
+        
+        if (elapsedPct < 15) {
+          emoji = '🤎';
+          status = 'Planted';
+          scale = 1;
+        } else if (elapsedPct < 35) {
+          emoji = '🌱';
+          status = 'Sprouting';
+          scale = 1.05;
+        } else if (elapsedPct < 55) {
+          emoji = '🌿';
+          status = 'Growing';
+          scale = 1.1;
+        } else if (elapsedPct < 75) {
+          emoji = '🪴';
+          status = 'Healthy';
+          scale = 1.15;
+        } else if (elapsedPct < 95) {
+          emoji = '🌳';
+          status = 'Maturing';
+          scale = 1.2;
+        } else {
+          emoji = '🌸';
+          status = 'Blossoming';
+          scale = 1.25;
+        }
+        
+        treeEmojiEl.textContent = emoji;
+        treeStatusEl.textContent = status;
+        treeEmojiEl.style.transform = `scale(${scale})`;
+      }
+    }
+  }
 }
 
 function updateStatsUI(stats) {
@@ -141,6 +200,14 @@ function startTimer(stats) {
         showBrowserNotification("Focus session complete!", "Time for a 5-minute break. Great work!");
         triggerConfettiCelebration();
 
+        // Push tree to forest
+        const trees = ['🌳', '🌸', '🌲', '🌴', '🍁', '🍂', '🎄'];
+        const chosenTree = trees[Math.floor(Math.random() * trees.length)];
+        const forest = getStorageItem('pomo_forest', []);
+        forest.push(chosenTree);
+        setStorageItem('pomo_forest', forest);
+        renderForestGarden();
+
         // Switch to break
         mode = 'break';
         secondsRemaining = 300; // 5 min break
@@ -166,6 +233,12 @@ function pauseTimer() {
 }
 
 function resetTimer() {
+  if (isRunning && mode === 'work' && secondsRemaining < 1500) {
+    const forest = getStorageItem('pomo_forest', []);
+    forest.push('🪵');
+    setStorageItem('pomo_forest', forest);
+    renderForestGarden();
+  }
   isRunning = false;
   clearInterval(currentTimer);
   mode = 'work';
@@ -414,4 +487,30 @@ function triggerConfettiCelebration() {
 
     setTimeout(() => c.remove(), 2100);
   }
+}
+
+export function renderForestGarden() {
+  const forest = getStorageItem('pomo_forest', []);
+  const grid = document.getElementById('forest-garden-grid');
+  const countSpan = document.getElementById('forest-tree-count');
+  
+  if (!grid) return;
+  grid.innerHTML = '';
+  
+  if (countSpan) countSpan.textContent = forest.length;
+  
+  if (forest.length === 0) {
+    grid.innerHTML = `<span style="grid-column: span 8; font-size: 11px; color: var(--text-muted); font-style: italic; text-align: center; width: 100%;">No trees planted yet. Start focusing!</span>`;
+    return;
+  }
+  
+  // Render up to 24 trees (the last 24)
+  const recent = forest.slice(-24);
+  recent.forEach(tree => {
+    const item = document.createElement('span');
+    item.textContent = tree;
+    item.style.filter = tree === '🪵' ? 'grayscale(0.6)' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))';
+    item.title = tree === '🪵' ? 'Failed focus session' : 'Successful focus session';
+    grid.appendChild(item);
+  });
 }
