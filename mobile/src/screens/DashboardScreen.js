@@ -32,6 +32,33 @@ import XPFlyAnimation from '../components/XPFlyAnimation';
 
 const { width, height } = Dimensions.get('window');
 
+const getTaskSubjectBadge = (title) => {
+  const t = (title || '').toLowerCase();
+  if (t.includes('physics') || t.includes('phy') || t.includes('mechanics') || t.includes('kinematics') || t.includes('thermo')) {
+    return { name: 'Physics', color: '#4B6BFB' };
+  } else if (t.includes('math') || t.includes('integration') || t.includes('calculus') || t.includes('algebra') || t.includes('trig') || t.includes('limits') || t.includes('stats')) {
+    return { name: 'Math', color: '#10B981' };
+  } else if (t.includes('chemistry') || t.includes('chem') || t.includes('organic') || t.includes('inorganic') || t.includes('physical chem')) {
+    return { name: 'Chemistry', color: '#8B5CF6' };
+  } else if (t.includes('biology') || t.includes('bio') || t.includes('botany') || t.includes('zoology')) {
+    return { name: 'Biology', color: '#EC4899' };
+  } else if (t.includes('cs') || t.includes('code') || t.includes('programming') || t.includes('python') || t.includes('java') || t.includes('javascript') || t.includes('html') || t.includes('react')) {
+    return { name: 'CompSci', color: '#3B82F6' };
+  }
+  return { name: 'Study', color: '#BA7517' };
+};
+
+const formatTaskDate = (dateStr) => {
+  if (!dateStr) return 'No Date';
+  try {
+    const d = new Date(dateStr);
+    const options = { month: 'short', day: 'numeric', weekday: 'short' };
+    return d.toLocaleDateString('en-US', options); // e.g. "Wed, Jun 3"
+  } catch (e) {
+    return dateStr;
+  }
+};
+
 export default function DashboardScreen() {
   const navigation = useNavigation();
   const userId = auth.currentUser ? auth.currentUser.uid : 'guest';
@@ -49,8 +76,8 @@ export default function DashboardScreen() {
   const [profile, setProfile] = useFirestoreData('user_profile', { name: emailPrefix, bio: 'Builder', avatar: null });
   const [gamification, setGamification] = useFirestoreData('gamification', { level: 1, xp: 0 });
   const [tasks, setTasks] = useFirestoreData('tasks', []);
-  const [hydration, setHydration] = useFirestoreData('hydration', { water: 0, target: 8 });
-  const [pomodoroStats, setPomodoroStats] = useFirestoreData('pomodoro_stats', { roundsToday: 0, date: new Date().toISOString().split('T')[0] });
+  const [hydration, setHydration] = useFirestoreData('hydration', { water: 0, target: 2000 });
+  const [pomodoroStats, setPomodoroStats] = useFirestoreData('pomodoro_stats', { roundsToday: 0, date: new Date().toLocaleDateString('en-CA') });
   
   // New Layout & Feature states
   const [timetable] = useFirestoreData('timetable', { Monday: [], Tuesday: [], Wednesday: [], Thursday: [], Friday: [], Saturday: [], Sunday: [] });
@@ -62,14 +89,10 @@ export default function DashboardScreen() {
   const [expenses] = useFirestoreData('expenses', []);
   
   const defaultDashboardConfig = [
-    { id: "profile", title: "Student ID Profile", visible: true, size: "full" },
     { id: "quests", title: "Daily Quests", visible: true, size: "full" },
     { id: "productivity", title: "Today's Productivity", visible: true, size: "full" },
     { id: "tasks", title: "Today's Tasks", visible: true, size: "full" },
-    { id: "calendar", title: "Study Calendar", visible: true, size: "full" },
-    { id: "sleep", title: "Sleep Tracker", visible: true, size: "full" },
-    { id: "timetable", title: "Next Lecture", visible: true, size: "compact" },
-    { id: "quote", title: "Quote of the Day", visible: false, size: "compact" }
+    { id: "calendar", title: "Study Calendar", visible: true, size: "full" }
   ];
   const [dashboardConfig, setDashboardConfig] = useFirestoreData('dashboard_config', defaultDashboardConfig);
 
@@ -88,6 +111,7 @@ export default function DashboardScreen() {
 
   // Gamification additions
   const [loginReward, setLoginReward] = useFirestoreData('login_rewards', { lastClaimed: '', streak: 0 });
+  const loginCheckedRef = useRef(false);
   const [dailyQuestStatus, setDailyQuestStatus] = useFirestoreData('daily_quest_status', { date: '', claimed: false });
   const [streaks, setStreaks] = useFirestoreData('streaks', {
     tasks: 0,
@@ -180,10 +204,13 @@ export default function DashboardScreen() {
   const slideAnim = useRef(new Animated.Value(25)).current;
   const confettiRef = useRef(null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const getLocalDateString = (date = new Date()) => {
+    return date.toLocaleDateString('en-CA');
+  };
+  const todayStr = getLocalDateString();
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const yesterdayStr = getLocalDateString(yesterday);
 
   useEffect(() => {
     const checkKickoff = async () => {
@@ -331,6 +358,26 @@ export default function DashboardScreen() {
     outputRange: [0.99, 1.01]
   });
 
+  const getUpcomingTasksThisWeek = () => {
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    const endOfWeek = new Date(startOfDay);
+    endOfWeek.setDate(endOfWeek.getDate() + 7);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const upcoming = tasks.filter(t => {
+      if (t.completed || !t.date) return false;
+      const tDate = new Date(t.date);
+      return tDate >= startOfDay && tDate <= endOfWeek;
+    });
+
+    upcoming.sort((a, b) => new Date(a.date) - new Date(b.date));
+    return upcoming.slice(0, 3);
+  };
+
+  const upcomingTasksList = getUpcomingTasksThisWeek();
+
   const activeTheme = getThemeConfig();
   const timeOfDayProfile = getTimeOfDayProfile();
   const glow = getAmbientGlow(timeOfDayProfile);
@@ -369,7 +416,7 @@ export default function DashboardScreen() {
               onPress={() => !isFirstRaw && handleSwapWidgets(index, -1)}
               disabled={isFirstRaw}
             >
-              <Ionicons name="arrow-up" size={14} color={isFirstRaw ? "#444" : "#C2A878"} />
+              <Ionicons name="arrow-up" size={14} color={isFirstRaw ? "#444" : "#BA7517"} />
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -377,14 +424,14 @@ export default function DashboardScreen() {
               onPress={() => !isLastRaw && handleSwapWidgets(index, 1)}
               disabled={isLastRaw}
             >
-              <Ionicons name="arrow-down" size={14} color={isLastRaw ? "#444" : "#C2A878"} />
+              <Ionicons name="arrow-down" size={14} color={isLastRaw ? "#444" : "#BA7517"} />
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={styles.editBtn} 
               onPress={() => handleToggleWidgetSize(widget.id)}
             >
-              <Ionicons name={widget.size === 'compact' ? "expand-outline" : "contract-outline"} size={14} color="#C2A878" />
+              <Ionicons name={widget.size === 'compact' ? "expand-outline" : "contract-outline"} size={14} color="#BA7517" />
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -402,7 +449,14 @@ export default function DashboardScreen() {
 
   // Daily Login Reward Check
   useEffect(() => {
-    if (!loginReward || loginReward.lastClaimed === todayStr) return;
+    if (!loginReward) return;
+    if (loginReward.lastClaimed === todayStr) {
+      loginCheckedRef.current = true;
+      return;
+    }
+    if (loginCheckedRef.current) return;
+
+    loginCheckedRef.current = true;
 
     let newStreak = 1;
     if (loginReward.lastClaimed === yesterdayStr) {
@@ -599,7 +653,7 @@ export default function DashboardScreen() {
       dailyGrade = 'B';
       focusStatus = 'Steady Progress';
       statusDesc = 'Good job! You are halfway through. Complete one more target!';
-      statusColor = '#C2A878';
+      statusColor = '#BA7517';
       statusIcon = 'trending-up';
     } else {
       dailyGrade = 'C';
@@ -836,8 +890,8 @@ export default function DashboardScreen() {
           backgroundColor: '#11141B', // Neutral dark
           borderColor: 'rgba(255, 255, 255, 0.04)',
           title: 'Planory Desk',
-          streakColor: '#C2A878',
-          textColor: '#C2A878'
+          streakColor: '#BA7517',
+          textColor: '#BA7517'
         };
     }
   };
@@ -856,7 +910,7 @@ export default function DashboardScreen() {
       return (
         <View style={styles.briefingCard}>
           <View style={styles.briefingHeader}>
-            <Ionicons name="calendar-outline" size={20} color="#C2A878" style={{ marginRight: 8 }} />
+            <Ionicons name="calendar-outline" size={20} color="#BA7517" style={{ marginRight: 8 }} />
             <Text style={styles.briefingTitle}>Here's Your Week Ahead 📅</Text>
           </View>
           <Text style={styles.briefingSubtitle}>Sunday Weekly Preview ritual. Set your intentions!</Text>
@@ -897,7 +951,7 @@ export default function DashboardScreen() {
           <Text style={styles.briefingSubtitle}>Morning briefing card ritual for {profile.name}</Text>
           <View style={styles.bulletList}>
             <View style={styles.bulletRow}>
-              <Ionicons name="list" size={14} color="#C2A878" style={{ marginRight: 8 }} />
+              <Ionicons name="list" size={14} color="#BA7517" style={{ marginRight: 8 }} />
               <Text style={styles.bulletText}>Tasks due today: {todayTasks.length} ({completedTodayTasks} completed)</Text>
             </View>
             <View style={styles.bulletRow}>
@@ -911,7 +965,7 @@ export default function DashboardScreen() {
           </View>
           
           <View style={styles.randomDataBox}>
-            <Ionicons name="analytics" size={12} color="#C2A878" style={{ marginRight: 6 }} />
+            <Ionicons name="analytics" size={12} color="#BA7517" style={{ marginRight: 6 }} />
             <Text style={styles.randomDataText}>
               Unexpected stat: You've completed {pomodoroStats.roundsToday || 3} Pomodoros today — that's {((pomodoroStats.roundsToday || 3) * 25 / 60).toFixed(1)} hours of deep study!
             </Text>
@@ -946,7 +1000,7 @@ export default function DashboardScreen() {
       } else if (nowMinutes < startMinutes) {
         const diff = startMinutes - nowMinutes;
         if (diff < 60) {
-          return { status: 'starting', text: `Starts in ${diff}m ⏳`, color: diff < 5 ? '#D4836A' : '#C2A878' };
+          return { status: 'starting', text: `Starts in ${diff}m ⏳`, color: diff < 5 ? '#D4836A' : '#BA7517' };
         } else {
           const hours = Math.floor(diff / 60);
           const mins = diff % 60;
@@ -1019,7 +1073,7 @@ export default function DashboardScreen() {
         text: "Morning Ritual: Setup today's schedule and focus targets.",
         action: () => navigation.navigate('Schedule'),
         btnText: 'Open Schedule',
-        color: '#C2A878'
+        color: '#BA7517'
       };
     } else if (currentHour >= 12 && currentHour < 18) {
       if (pendingTask) {
@@ -1036,7 +1090,7 @@ export default function DashboardScreen() {
         text: 'All tasks completed! Revise your whiteboard scanned notes.',
         action: () => navigation.navigate('NotesWorkspace'),
         btnText: 'Read Notes',
-        color: '#C2A878'
+        color: '#BA7517'
       };
     } else if (currentHour >= 18 && currentHour < 21) {
       const uncheckedHabits = habits.filter(h => !h.logs || !h.logs.includes(todayStr)).length;
@@ -1083,11 +1137,11 @@ export default function DashboardScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: headerConfig.backgroundColor, borderBottomWidth: 1, borderBottomColor: headerConfig.borderColor }]}>
         <TouchableOpacity onPress={() => setShowHub(true)} style={styles.hamburger}>
-          <Ionicons name="menu" size={28} color="#F3F1EC" />
+          <Ionicons name="menu-outline" size={24} color="#F3F1EC" />
         </TouchableOpacity>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={[styles.headerTitle, { color: activeTheme.themeId === 'exams' || isExamWeek ? '#E11D48' : '#F3F1EC' }]}>
-            {activeTheme.themeId === 'diwali' ? 'Shubh Planory' : activeTheme.themeId === 'independence' ? 'Jai Hind Desk' : headerConfig.title}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={[styles.headerTitle, { color: isExamWeek ? '#E11D48' : '#F3F1EC' }]}>
+            {headerConfig.title}
           </Text>
           {isExamWeek && (
             <View style={styles.examModeBadge}>
@@ -1096,702 +1150,399 @@ export default function DashboardScreen() {
           )}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <TouchableOpacity onPress={() => setIsEditingLayout(!isEditingLayout)} style={styles.reorderToggle}>
-            <Ionicons name={isEditingLayout ? "checkmark-done" : "build-outline"} size={20} color={isEditingLayout ? activeTheme.primaryColor : "#8B92A0"} />
+          <TouchableOpacity onPress={() => navigation.navigate('AlarmWorkspace')} style={styles.headerCircleBtn}>
+            <Ionicons name="alarm-outline" size={18} color="#8B92A0" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowStreakModal(true)} style={styles.headerStreak}>
-            <Ionicons name={activeTheme.streakIcon} size={20} color={headerConfig.streakColor} />
-            <Text style={[styles.headerStreakText, { color: headerConfig.streakColor }]}>{(streaks.tasks || 0) + (streaks.focus || 0)}</Text>
+          <TouchableOpacity onPress={() => setShowStreakModal(true)} style={styles.streakPill}>
+            <Text style={styles.streakEmoji}>🔥</Text>
+            <Text style={styles.streakCountText}>{(streaks.tasks || 0) + (streaks.focus || 0)}</Text>
           </TouchableOpacity>
         </View>
       </View>
-
-      <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+        <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
         <ScrollView 
           contentContainerStyle={{ padding: 24, paddingBottom: 80 }}
           refreshControl={
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh} 
-              colors={['#C2A878']} 
-              tintColor="#C2A878" 
+              colors={['#BA7517']} 
+              tintColor="#BA7517" 
             />
           }
         >
           
-          {/* Dynamic greeting banner */}
-          <View style={[styles.greetingBanner, (activeTheme.themeId === 'exams' || isExamWeek) && { borderColor: 'rgba(225, 29, 72, 0.2)' }]}>
-            <Text style={[styles.greetingTitle, { color: activeTheme.themeId === 'exams' || isExamWeek ? '#E11D48' : '#F3F1EC' }]}>
-              {activeTheme.greetingPrefix ? `${activeTheme.greetingPrefix}, ` : ''}{greetingText}
+          {/* Mockup Greeting Banner */}
+          <View style={styles.mockGreetingCard}>
+            <Text style={styles.mockGreetingTitle}>
+              Good {timeOfDayProfile === 'morning' ? 'morning' : timeOfDayProfile === 'afternoon' ? 'afternoon' : timeOfDayProfile === 'evening' ? 'evening' : 'night'}, {profile.name}! 🌙
             </Text>
-            <Text style={styles.greetingSub}>{activeTheme.brandingMessage || contextualSub}</Text>
+            <Text style={styles.mockGreetingSub}>
+              {timeOfDayProfile === 'night' ? 'Late night grind? ⚡' : 'Time to focus and build streaks! 🚀'}
+            </Text>
           </View>
 
-          {/* Daily Pulse Mini-Stats Row */}
-          <View style={styles.dailyPulseRow}>
-            <View style={[styles.pulseCard, { borderLeftColor: '#4B6BFB' }]}>
-              <Ionicons name="checkbox-outline" size={16} color="#4B6BFB" />
-              <Text style={styles.pulseVal}>{completedTodayTasks}/{todayTasks.length}</Text>
-              <Text style={styles.pulseLabel}>Tasks</Text>
+          {/* Daily Pulse Mini-Stats Row (3 Columns) */}
+          <View style={styles.mockStatsRow}>
+            {/* Tasks Card */}
+            <View style={styles.mockStatCard}>
+              <View style={[styles.mockStatIconBg, { backgroundColor: 'rgba(59, 130, 246, 0.12)' }]}>
+                <Ionicons name="checkbox-outline" size={16} color="#3B82F6" />
+              </View>
+              <Text style={styles.mockStatValue}>{completedTodayTasks}/{todayTasks.length}</Text>
+              <Text style={styles.mockStatLabel}>Tasks</Text>
             </View>
-            <View style={[styles.pulseCard, { borderLeftColor: '#FF8C00' }]}>
-              <Ionicons name="timer-outline" size={16} color="#FF8C00" />
-              <Text style={styles.pulseVal}>{pomodoroStats.roundsToday}</Text>
-              <Text style={styles.pulseLabel}>Focus</Text>
+
+            {/* Focus Card */}
+            <View style={styles.mockStatCard}>
+              <View style={[styles.mockStatIconBg, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
+                <Ionicons name="timer-outline" size={16} color="#F59E0B" />
+              </View>
+              <Text style={styles.mockStatValue}>{pomodoroStats.roundsToday || 0}</Text>
+              <Text style={styles.mockStatLabel}>Focus</Text>
             </View>
-            <View style={[styles.pulseCard, { borderLeftColor: '#7C9B7A' }]}>
-              <Ionicons name="flame-outline" size={16} color="#7C9B7A" />
-              <Text style={styles.pulseVal}>
+
+            {/* Habits Card */}
+            <View style={styles.mockStatCard}>
+              <View style={[styles.mockStatIconBg, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
+                <Ionicons name="flame-outline" size={16} color="#10B981" />
+              </View>
+              <Text style={styles.mockStatValue}>
                 {habits.filter(h => h.logs && h.logs.includes(todayStr)).length}/{habits.length}
               </Text>
-              <Text style={styles.pulseLabel}>Habits</Text>
-            </View>
-            <View style={[styles.pulseCard, { borderLeftColor: '#00BFFF' }]}>
-              <Ionicons name="water-outline" size={16} color="#00BFFF" />
-              <Text style={styles.pulseVal}>
-                {(() => {
-                  const displayWaterTarget = hydration.target || 2000;
-                  const displayWaterCurrent = hydration.water || 0;
-                  return Math.round(Math.min((displayWaterCurrent / (displayWaterTarget || 2000)) * 100, 100));
-                })()}%
-              </Text>
-              <Text style={styles.pulseLabel}>Water</Text>
+              <Text style={styles.mockStatLabel}>Habits</Text>
             </View>
           </View>
 
-          {/* Smart Contextual Guidance recommendation box */}
-          {(() => {
-            const suggestion = getSmartSuggestion();
-            if (!suggestion) return null;
-            return (
-              <TouchableOpacity 
-                style={[styles.smartSuggestionBox, { borderLeftColor: suggestion.color }]} 
-                onPress={suggestion.action}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.smartSuggestionIconCircle, { backgroundColor: `${suggestion.color}15` }]}>
-                  <Ionicons name={suggestion.icon} size={20} color={suggestion.color} />
-                </View>
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.smartSuggestionTitle}>RECOMMENDED ACTION</Text>
-                  <Text style={styles.smartSuggestionText}>{suggestion.text}</Text>
-                </View>
-                <View style={[styles.smartSuggestionBtn, { backgroundColor: suggestion.color }]}>
-                  <Text style={styles.smartSuggestionBtnText}>{suggestion.btnText}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })()}
-
-          {/* Hot summer day weather hydration nudge */}
-          {showWeatherNudge && (
-            <View style={styles.weatherNudgeBox}>
-              <Ionicons name="sunny" size={20} color="#FFD700" style={{ marginRight: 10 }} />
-              <Text style={styles.weatherNudgeText}>Hot sunny day outside! Stay hydrated: drink at least 3L water today. ☀️</Text>
-            </View>
-          )}
-
-          {/* Morning briefing card / Sunday preview ritual */}
-          {renderBriefingCard()}
-
-          {/* Night Wind-down Alert banner (If 9 PM and not done) */}
+          {/* Wind-down hour prompts (If night) */}
           {(() => {
             const currentHour = new Date().getHours();
-            const isWindDownTime = currentHour >= 21 || currentHour < 4;
-            const ratingKey = `rating_${todayStr}`;
-            const alreadyRatedToday = dayRatings && dayRatings[ratingKey] !== undefined;
-            if (isWindDownTime && !alreadyRatedToday) {
-              return (
-                <TouchableOpacity style={styles.windDownBanner} onPress={() => setShowWindDown(true)}>
-                  <Ionicons name="moon" size={24} color="#FFE5B4" style={{ marginRight: 12 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.windDownBannerTitle}>Wind-Down Routine Ready</Text>
-                    <Text style={styles.windDownBannerSub}>Plan tomorrow, carry-over tasks, and prep sleep.</Text>
+            const isNight = currentHour >= 21 || currentHour < 4;
+            if (!isNight) return null;
+            return (
+              <View style={{ gap: 10, marginBottom: 20 }}>
+                {/* Wind-down start card */}
+                <View style={styles.mockWindDownCard}>
+                  <View style={styles.mockWindDownHeader}>
+                    <Text style={styles.mockWindDownEmoji}>🌙</Text>
+                    <View style={{ flex: 1, marginLeft: 12, marginRight: 8 }}>
+                      <Text style={styles.mockWindDownTitle}>Wind-down hour: plan tomorrow & record sleep quality.</Text>
+                      <Text style={styles.mockWindDownDesc}>Wrap up your day mindfully.</Text>
+                    </View>
+                    <TouchableOpacity style={styles.mockWindDownStartBtn} onPress={() => setShowWindDown(true)}>
+                      <Text style={styles.mockWindDownStartBtnText}>Start</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Wind-down ready card */}
+                <TouchableOpacity style={styles.mockWindDownReadyCard} onPress={() => setShowWindDown(true)}>
+                  <Text style={styles.mockWindDownEmoji}>🌙</Text>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.mockWindDownReadyTitle}>Wind-Down Routine Ready</Text>
+                    <Text style={styles.mockWindDownReadyDesc}>Plan tomorrow, carry-over tasks, and prep sleep.</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color="#FFE5B4" />
                 </TouchableOpacity>
-              );
-            }
-            return null;
-          })()}
-
-          {/* Dynamic widgets rendering loop */}
-          {(() => {
-            const config = [...dashboardConfig];
-            if (!config.some(w => w.id === 'heatmap')) {
-              config.push({ id: 'heatmap', title: 'Study Heatmap', visible: true, size: 'full' });
-            }
-            return config;
-          })().map((widget, index) => {
-            if (!widget.visible) return null;
-            
-            let widgetContent = null;
-            
-            if (widget.id === 'profile') {
-              widgetContent = widget.size === 'full' ? (
-                /* Profile Card Full */
-                <TouchableOpacity 
-                  style={[styles.profileCard, activeTheme.themeId === 'exams' && { borderColor: 'rgba(225, 29, 72, 0.15)' }]} 
-                  onPress={() => navigation.navigate('ProfileWorkspace')}
-                  activeOpacity={0.9}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
-                    <View style={styles.avatarCircle}>
-                      <Ionicons name="person" size={24} color={activeTheme.primaryColor} />
-                    </View>
-                    <View style={{ marginLeft: 16, flex: 1 }}>
-                      <Text style={styles.name}>{profile.name}</Text>
-                      <Text style={styles.bio} numberOfLines={1}>{profile.bio || 'Desk Builder'}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#5A6070" style={{ marginLeft: 8 }} />
-                  </View>
-                  <View style={{ marginTop: 24 }}>
-                    <View style={styles.levelHeader}>
-                      <Text style={[styles.levelText, { color: activeTheme.primaryColor }]}>{getLevelTitle(gamification.level)} (LVL {gamification.level})</Text>
-                      <Text style={styles.xpText}>{gamification.xp} / {gamification.level * 100} XP</Text>
-                    </View>
-                    <View style={styles.progressBg}>
-                      <View style={[styles.progressFill, { width: `${xpProgress}%`, backgroundColor: activeTheme.primaryColor }]} />
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ) : (
-                /* Profile Card Compact */
-                <TouchableOpacity 
-                  style={styles.profileCardCompact} 
-                  onPress={() => navigation.navigate('ProfileWorkspace')}
-                  activeOpacity={0.9}
-                >
-                  <Ionicons name="person-circle" size={28} color={activeTheme.primaryColor} />
-                  <View style={{ marginLeft: 12, flex: 1 }}>
-                    <Text style={styles.profileCompactName}>{profile.name} (LVL {gamification.level})</Text>
-                    <Text style={styles.profileCompactXp}>{gamification.xp} / {gamification.level * 100} XP</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#5A6070" />
-                </TouchableOpacity>
-              );
-            } else if (widget.id === 'quests') {
-              widgetContent = widget.size === 'full' ? (
-                /* Quests Full */
-                <View style={styles.sectionNoMargin}>
-                  <View style={styles.questsCard}>
-                    <TouchableOpacity 
-                      style={styles.questRow}
-                      onPress={handleTapHydrationQuest}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons 
-                        name={questWaterMet ? "checkmark-circle" : "ellipse-outline"} 
-                        size={20} 
-                        color={questWaterMet ? "#7C9B7A" : "#5A6070"} 
-                        style={{ marginRight: 12 }}
-                      />
-                      <Text style={[styles.questText, questWaterMet && styles.questTextCompleted]}>
-                        Log 1.5L Hydration ({currentWaterAmount}/{questWaterGoal} ml)
-                      </Text>
-                    </TouchableOpacity>
-                    <View style={styles.questDivider} />
-                    <TouchableOpacity 
-                      style={styles.questRow}
-                      onPress={handleTapFocusQuest}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons 
-                        name={questFocusMet ? "checkmark-circle" : "ellipse-outline"} 
-                        size={20} 
-                        color={questFocusMet ? "#7C9B7A" : "#5A6070"} 
-                        style={{ marginRight: 12 }}
-                      />
-                      <Text style={[styles.questText, questFocusMet && styles.questTextCompleted]}>
-                        Complete 2 Pomodoro Rounds ({(pomodoroStats.roundsToday || 0)}/2)
-                      </Text>
-                    </TouchableOpacity>
-                    <View style={styles.questDivider} />
-                    <TouchableOpacity 
-                      style={styles.questRow}
-                      onPress={handleTapTasksQuest}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons 
-                        name={questTasksMet ? "checkmark-circle" : "ellipse-outline"} 
-                        size={20} 
-                        color={questTasksMet ? "#7C9B7A" : "#5A6070"} 
-                        style={{ marginRight: 12 }}
-                      />
-                      <Text style={[styles.questText, questTasksMet && styles.questTextCompleted]}>
-                        Complete 3 Scheduled Tasks ({completedTodayTasks}/3)
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                /* Quests Compact */
-                <View style={styles.questsCardCompact}>
-                  <Text style={styles.questCompactTitle}>DAILY QUESTS PROGRESS</Text>
-                  <Text style={styles.questCompactProgress}>
-                    {((questWaterMet?1:0) + (questFocusMet?1:0) + (questTasksMet?1:0))}/3 Completed • {allQuestsCompleted ? "All Clean! 🎉" : "Grinding..."}
-                  </Text>
-                </View>
-              );
-            } else if (widget.id === 'productivity') {
-              widgetContent = widget.size === 'full' ? (
-                /* Productivity Score Full */
-                <View style={styles.sectionNoMargin}>
-                  <View style={styles.scoreCard}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 16 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <View style={[styles.gradeCircle, { borderColor: activeTheme.primaryColor }]}>
-                          <Text style={[styles.scoreGrade, { color: activeTheme.primaryColor }]}>{dailyGrade}</Text>
-                        </View>
-                        <View style={{ marginLeft: 12 }}>
-                          <Text style={styles.scoreTitle}>{focusStatus}</Text>
-                          <Text style={styles.scoreSub}>{completedTodayTasks} / {todayTasks.length} Tasks completed</Text>
-                        </View>
-                      </View>
-                      <Ionicons name={statusIcon} size={28} color={statusColor} />
-                    </View>
-                    <View style={styles.plantProgressBg}>
-                      <View style={[styles.plantProgressFill, { width: `${plantProgress}%`, backgroundColor: activeTheme.primaryColor }]} />
-                    </View>
-                    <Text style={styles.scoreDesc}>{statusDesc}</Text>
-                  </View>
-                </View>
-              ) : (
-                /* Productivity Score Compact */
-                <View style={styles.scoreCardCompact}>
-                  <Text style={styles.scoreCompactTitle}>Grade: {dailyGrade} ({completedTodayTasks}/{todayTasks.length} Tasks)</Text>
-                  <Text style={styles.scoreCompactDesc}>{focusStatus}</Text>
-                </View>
-              );
-            } else if (widget.id === 'calendar') {
-              widgetContent = widget.size === 'full' ? (
-                /* Calendar Full */
-                <View style={styles.sectionNoMargin}>
-                  <View style={styles.calendarToggle}>
-                    <TouchableOpacity style={[styles.toggleBtn, calendarView === 'weekly' && styles.toggleBtnActive]} onPress={() => setCalendarView('weekly')}>
-                      <Text style={[styles.toggleBtnText, calendarView === 'weekly' && styles.toggleBtnTextActive]}>Weekly</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.toggleBtn, calendarView === 'monthly' && styles.toggleBtnActive]} onPress={() => setCalendarView('monthly')}>
-                      <Text style={[styles.toggleBtnText, calendarView === 'monthly' && styles.toggleBtnTextActive]}>Monthly Grid</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {calendarView === 'monthly' ? (
-                    <View style={styles.customCalendarContainer}>
-                      <View style={styles.calendarHeader}>
-                        <TouchableOpacity onPress={handlePrevMonth}>
-                          <Ionicons name="chevron-back" size={20} color={activeTheme.primaryColor} />
-                        </TouchableOpacity>
-                        <Text style={styles.calendarHeaderTitle}>
-                          {currentMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                        </Text>
-                        <TouchableOpacity onPress={handleNextMonth}>
-                          <Ionicons name="chevron-forward" size={20} color={activeTheme.primaryColor} />
-                        </TouchableOpacity>
-                      </View>
-
-                      <View style={styles.dayNamesRow}>
-                        {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
-                          <Text key={day} style={styles.dayNameCell}>{day}</Text>
-                        ))}
-                      </View>
-
-                      <View style={styles.gridContainer}>
-                        {generateMonthDays(currentMonthDate).map((cell, index) => {
-                          const cellDateStr = cell.date.toISOString().split('T')[0];
-                          const cellTasks = tasks.filter(t => t.date === cellDateStr);
-                          const isToday = cellDateStr === todayStr;
-                          const isSelected = selectedCalendarDate === cellDateStr;
-                          
-                          const completedCount = cellTasks.filter(t => t.completed).length;
-                          const pendingCount = cellTasks.length - completedCount;
-                          
-                          return (
-                            <TouchableOpacity 
-                              key={index} 
-                              style={[
-                                styles.gridCell, 
-                                !cell.isCurrentMonth && styles.gridCellMuted,
-                                isToday && styles.gridCellToday,
-                                isSelected && styles.gridCellSelected
-                              ]}
-                              onPress={() => setSelectedCalendarDate(cellDateStr)}
-                            >
-                              <Text style={[
-                                styles.cellDayText, 
-                                !cell.isCurrentMonth && styles.cellDayTextMuted,
-                                isToday && { color: activeTheme.primaryColor }
-                              ]}>
-                                {cell.date.getDate()}
-                              </Text>
-                              {cellTasks.length > 0 && (
-                                <View style={styles.dotsRow}>
-                                  {Array.from({ length: Math.min(completedCount, 3) }).map((_, i) => (
-                                    <View key={`c-${i}`} style={[styles.dot, styles.dotCompleted]} />
-                                  ))}
-                                  {Array.from({ length: Math.min(pendingCount, 3) }).map((_, i) => (
-                                    <View key={`p-${i}`} style={[styles.dot, styles.dotPending]} />
-                                  ))}
-                                </View>
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={styles.calendarCardCompact}>
-                      <Text style={styles.calendarCompactTitle}>WEEKLY ROUTINE RUNNING</Text>
-                      <Text style={styles.calendarCompactDesc}>Open Schedule Tab below to review week layout.</Text>
-                    </View>
-                  )}
-                </View>
-              ) : (
-                /* Calendar Compact */
-                <View style={styles.calendarCardCompact}>
-                  <Text style={styles.calendarCompactTitle}>STUDY CALENDAR</Text>
-                  <Text style={styles.calendarCompactDesc}>
-                    {calendarView === 'monthly' ? "Monthly Grid active" : "Weekly Schedule active"}.
-                  </Text>
-                </View>
-              );
-            } else if (widget.id === 'tasks') {
-              widgetContent = widget.size === 'full' ? (
-                /* Tasks Full */
-                <View style={styles.sectionNoMargin}>
-                  <View style={{ marginTop: 12 }}>
-                    {todayTasks.length === 0 ? (
-                      <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateText}>Clear schedule. A calm mind starts here.</Text>
-                      </View>
-                    ) : (
-                      todayTasks.map(item => (
-                        <TouchableOpacity 
-                          key={item.id}
-                          style={[styles.taskCard, item.completed && styles.taskCardCompleted]}
-                          onPress={() => toggleTask(item.id)}
-                          activeOpacity={0.8}
-                        >
-                          <View style={[styles.checkbox, item.completed && [styles.checkboxChecked, { backgroundColor: activeTheme.primaryColor, borderColor: activeTheme.primaryColor }]]} />
-                          <Text style={[styles.taskTitle, item.completed && styles.taskTitleCompleted]}>
-                            {item.title}
-                          </Text>
-                        </TouchableOpacity>
-                      ))
-                    )}
-
-                    {/* Inline Task Input Row */}
-                    <View style={styles.inlineInputRow}>
-                      <TextInput
-                        style={styles.inlineTaskInput}
-                        value={newTaskText}
-                        onChangeText={setNewTaskText}
-                        placeholder="Add a new task for today..."
-                        placeholderTextColor="#5A6070"
-                        onSubmitEditing={handleAddTask}
-                      />
-                      <TouchableOpacity style={[styles.inlineAddBtn, { backgroundColor: activeTheme.primaryColor }]} onPress={handleAddTask}>
-                        <Ionicons name="add" size={20} color="#0F1115" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              ) : (
-                /* Tasks Compact */
-                <View style={styles.tasksCardCompact}>
-                  <Text style={styles.tasksCompactTitle}>TODAY'S STUDY LIST</Text>
-                  <Text style={styles.tasksCompactDesc}>
-                    {todayTasks.filter(t => !t.completed).length} pending study targets.
-                  </Text>
-                </View>
-              );
-            } else if (widget.id === 'sleep') {
-              widgetContent = widget.size === 'full' ? (
-                /* Sleep Tracker Full */
-                <View style={styles.sleepTrackerFull}>
-                  
-                  <View style={styles.sleepInputRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.sleepInputLabel}>Bedtime</Text>
-                      <TextInput 
-                        style={styles.sleepTimeInput}
-                        value={sleepBedTime}
-                        onChangeText={setSleepBedTime}
-                        placeholder="22:30"
-                        placeholderTextColor="#5A6070"
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.sleepInputLabel}>Wake time</Text>
-                      <TextInput 
-                        style={styles.sleepTimeInput}
-                        value={sleepWakeTime}
-                        onChangeText={setSleepWakeTime}
-                        placeholder="06:30"
-                        placeholderTextColor="#5A6070"
-                      />
-                    </View>
-                  </View>
-                  
-                  <Text style={styles.sleepInputLabel}>Sleep Quality (1-5)</Text>
-                  <View style={styles.sleepRatingRow}>
-                    {[1, 2, 3, 4, 5].map(val => (
-                      <TouchableOpacity 
-                        key={val} 
-                        style={[styles.sleepRatingBtn, sleepRating === val && [styles.sleepRatingBtnActive, { backgroundColor: activeTheme.primaryColor, borderColor: activeTheme.primaryColor }]]}
-                        onPress={() => setSleepRating(val)}
-                      >
-                        <Text style={[styles.sleepRatingBtnText, sleepRating === val && { color: '#0F1115' }]}>{val}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-
-                  <TouchableOpacity style={[styles.sleepSaveBtn, { backgroundColor: activeTheme.primaryColor }]} onPress={handleLogSleep}>
-                    <Text style={styles.sleepSaveBtnText}>Save Sleep Log</Text>
-                  </TouchableOpacity>
-
-                  {/* Bar Chart */}
-                  {sleepLogs.length > 0 && (
-                    <View style={{ marginTop: 20 }}>
-                      <Text style={styles.sleepInputLabel}>WEEKLY SLEEP TRENDS</Text>
-                      <View style={styles.sleepBarChart}>
-                        {sleepLogs.slice(0, 7).reverse().map((log, idx) => {
-                          const barHeight = Math.min((log.hours / 10) * 80, 80);
-                          const isUnderSleeping = log.hours < 6;
-                          const dateObj = new Date(log.date);
-                          const dayInitial = dateObj.toLocaleDateString('en-US', { weekday: 'narrow' });
-                          
-                          return (
-                            <View key={idx} style={styles.sleepBarCol}>
-                              <Text style={styles.sleepBarVal}>{log.hours}h</Text>
-                              <View style={[styles.sleepBarFill, { height: barHeight, backgroundColor: isUnderSleeping ? '#C47070' : '#7C9B7A' }]} />
-                              <Text style={styles.sleepBarLabel}>{dayInitial}</Text>
-                            </View>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Tip nudge */}
-                  <View style={styles.sleepTipCard}>
-                    <Ionicons name="bulb-outline" size={16} color={activeTheme.primaryColor} style={{ marginRight: 8 }} />
-                    <Text style={styles.sleepTipText}>
-                      {sleepLogs.length > 0 && sleepLogs[0].hours < 6 
-                        ? `You slept ${sleepLogs[0].hours}h last night. Consider a 20-min nap before your afternoon study session.`
-                        : "Great sleep! A fully charged brain is ready for deep focus. Let's hit our targets today."
-                      }
-                    </Text>
-                  </View>
-                </View>
-              ) : (
-                /* Sleep Tracker Compact */
-                <View style={styles.sleepTrackerCompact}>
-                  <Ionicons name="moon-outline" size={18} color={activeTheme.primaryColor} style={{ marginRight: 8 }} />
-                  <Text style={styles.sleepCompactText}>
-                    Last Night Sleep: {sleepLogs.length > 0 ? `${sleepLogs[0].hours}h (${sleepLogs[0].rating}/5)` : 'No sleep logged.'}
-                  </Text>
-                </View>
-              );
-            } else if (widget.id === 'timetable') {
-              widgetContent = widget.size === 'full' ? (
-                /* Timetable Full */
-                <View style={styles.sleepTrackerFull}>
-                  {(() => {
-                    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                    const todayDay = weekdays[new Date().getDay()];
-                    const todayClasses = timetable && timetable[todayDay] ? timetable[todayDay] : [];
-                    if (todayClasses.length === 0) {
-                      return <Text style={styles.noClassesText}>No classes scheduled for today! 💤</Text>;
-                    }
-                    return todayClasses.map((cls) => {
-                      const status = getClassStatusMessage(cls.time);
-                      const classKey = `${cls.subject}_${cls.time}`;
-                      const isAttended = attendance?.attended?.[todayStr]?.includes(classKey);
-                      return (
-                        <TouchableOpacity 
-                          key={cls.id || classKey} 
-                          style={[styles.classWidgetRow, isAttended && styles.classWidgetRowAttended]}
-                          onPress={() => toggleClassAttended(cls)}
-                          activeOpacity={0.8}
-                        >
-                          <View style={[
-                            styles.classCheckCircle, 
-                            isAttended && { backgroundColor: '#7C9B7A', borderColor: '#7C9B7A' }
-                          ]}>
-                            {isAttended && <Ionicons name="checkmark" size={12} color="#0F1115" />}
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={[styles.classWidgetSubject, isAttended && styles.classWidgetSubjectAttended]}>{cls.subject}</Text>
-                            <Text style={styles.classWidgetTime}>{cls.time} • {cls.room || 'No Room'}</Text>
-                          </View>
-                          {isAttended ? (
-                            <View style={[styles.classStatusPill, { backgroundColor: 'rgba(124, 155, 122, 0.15)' }]}>
-                              <Text style={[styles.classStatusText, { color: '#7C9B7A' }]}>Attended ✓</Text>
-                            </View>
-                          ) : (
-                            status && (
-                              <View style={[styles.classStatusPill, { backgroundColor: `${status.color}15` }]}>
-                                <Text style={[styles.classStatusText, { color: status.color }]}>{status.text}</Text>
-                              </View>
-                            )
-                          )}
-                        </TouchableOpacity>
-                      );
-                    });
-                  })()}
-                </View>
-              ) : (
-                /* Timetable Compact */
-                <View style={styles.timetableWidgetCompact}>
-                  <Ionicons name="school-outline" size={18} color={activeTheme.primaryColor} style={{ marginRight: 8 }} />
-                  <Text style={styles.timetableCompactText} numberOfLines={1}>
-                    {(() => {
-                      const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                      const todayDay = weekdays[new Date().getDay()];
-                      const todayClasses = timetable && timetable[todayDay] ? timetable[todayDay] : [];
-                      if (todayClasses.length === 0) return 'No classes today! Sleep/study mode.';
-                      const status = getClassStatusMessage(todayClasses[0].time);
-                      const statusSuffix = status ? ` (${status.text})` : '';
-                      return `Next: ${todayClasses[0].subject} at ${todayClasses[0].time.split(' - ')[0]}${statusSuffix}`;
-                    })()}
-                  </Text>
-                </View>
-              );
-            } else if (widget.id === 'quote') {
-              widgetContent = widget.size === 'full' ? (
-                /* Quote Full */
-                <View style={styles.quoteCardFull}>
-                  <Ionicons name="quote" size={24} color="rgba(194,168,120,0.15)" style={{ alignSelf: 'flex-start', marginBottom: 4 }} />
-                  <Text style={styles.quoteCardText}>
-                    “Success is the sum of small efforts, repeated day-in and day-out.”
-                  </Text>
-                  <Text style={styles.quoteCardAuthor}>— Robert Collier</Text>
-                  <View style={styles.quoteTipGlow}>
-                    <Text style={styles.quoteTipText}>Tip: Try break study sessions into 25 min blocks. It helps you prevent backlogs!</Text>
-                  </View>
-                </View>
-              ) : (
-                /* Quote Compact */
-                <View style={styles.quoteCardCompact}>
-                  <Text style={styles.quoteCompactText} numberOfLines={1}>
-                    “Success is the sum of small efforts, repeated daily.”
-                  </Text>
-                </View>
-              );
-            } else if (widget.id === 'heatmap') {
-              widgetContent = (
-                <View style={styles.sectionNoMargin}>
-                  <View style={styles.heatmapCard}>
-                    <View style={styles.heatmapDaysRow}>
-                      {(() => {
-                        const days = [];
-                        for (let i = 6; i >= 0; i--) {
-                          const d = new Date();
-                          d.setDate(d.getDate() - i);
-                          days.push(d);
-                        }
-                        return days.map((day, idx) => {
-                          const dateStr = day.toISOString().split('T')[0];
-                          const dayTasks = tasks.filter(t => t.date === dateStr);
-                          const compTasks = dayTasks.filter(t => t.completed).length;
-                          const compHabits = habits.filter(h => h.logs && h.logs.includes(dateStr)).length;
-                          
-                          const totalActivities = dayTasks.length + habits.length;
-                          const compActivities = compTasks + compHabits;
-                          
-                          let squareColor = 'rgba(255, 255, 255, 0.03)';
-                          
-                          if (totalActivities > 0) {
-                            const ratio = compActivities / totalActivities;
-                            if (ratio >= 0.8) {
-                              squareColor = '#7C9B7A'; // green
-                            } else if (ratio >= 0.4) {
-                              squareColor = '#C2A878'; // gold
-                            } else if (compActivities > 0) {
-                              squareColor = 'rgba(194, 168, 120, 0.3)'; // light gold
-                            }
-                          }
-
-                          const isToday = dateStr === todayStr;
-                          
-                          return (
-                            <View key={idx} style={styles.heatmapDayCol}>
-                              <View 
-                                style={[
-                                  styles.heatmapSquare, 
-                                  { backgroundColor: squareColor },
-                                  isToday && { borderWidth: 1.5, borderColor: '#C2A878' }
-                                ]} 
-                              />
-                              <Text style={styles.heatmapDayLabel}>
-                                {day.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1)}
-                              </Text>
-                              <Text style={styles.heatmapDateLabel}>
-                                {day.getDate()}
-                              </Text>
-                            </View>
-                          );
-                        });
-                      })()}
-                    </View>
-                    <View style={styles.heatmapLegendRow}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <View style={[styles.legendSquare, { backgroundColor: 'rgba(255,255,255,0.03)' }]} />
-                        <Text style={styles.legendText}>None</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <View style={[styles.legendSquare, { backgroundColor: 'rgba(194, 168, 120, 0.3)' }]} />
-                        <Text style={styles.legendText}>Low</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <View style={[styles.legendSquare, { backgroundColor: '#C2A878' }]} />
-                        <Text style={styles.legendText}>Med</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <View style={[styles.legendSquare, { backgroundColor: '#7C9B7A' }]} />
-                        <Text style={styles.legendText}>High</Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              );
-            }
-
-            let titleText = widget.title || widget.id.toUpperCase();
-            if (widget.id === 'quests') titleText = "DAILY QUESTS (XP MULTIPLIER)";
-            if (widget.id === 'productivity') titleText = "TODAY'S PRODUCTIVITY";
-            if (widget.id === 'calendar') titleText = "STUDY CALENDAR";
-            if (widget.id === 'tasks') titleText = "TODAY'S TASKS";
-            if (widget.id === 'sleep') titleText = "SLEEP TRACKING";
-            if (widget.id === 'timetable') titleText = "TODAY'S CLASSES";
-            if (widget.id === 'quote') titleText = "QUOTE OF THE DAY";
-            if (widget.id === 'heatmap') titleText = "STUDY HEATMAP (LAST 7 DAYS)";
-            if (widget.id === 'profile') titleText = "STUDENT ID PROFILE";
-
-            const isCollapsed = collapsedWidgets[widget.id];
-
-            const wrappedContent = (
-              <View style={{ marginBottom: 20 }}>
-                <TouchableOpacity 
-                  style={styles.collapsibleWidgetHeader} 
-                  onPress={() => toggleWidgetCollapse(widget.id)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.sectionTitle}>{titleText}</Text>
-                  <Ionicons name={isCollapsed ? "chevron-down" : "chevron-up"} size={16} color="#5A6070" />
-                </TouchableOpacity>
-                {!isCollapsed && widgetContent}
               </View>
             );
+          })()}
 
-            return renderWidgetWrapper(widget, wrappedContent, index);
-          })}
+          {/* Daily Quests Widget */}
+          <View style={styles.widgetCard}>
+            <View style={styles.widgetHeaderRow}>
+              <Text style={styles.widgetHeaderTitle}>DAILY QUESTS (XP MULTIPLIER)</Text>
+              <Ionicons name="chevron-up" size={16} color="#5A6070" />
+            </View>
+            <View style={{ marginTop: 8 }}>
+              {/* Quest 1 */}
+              <TouchableOpacity 
+                style={styles.questItemRow} 
+                onPress={handleTapHydrationQuest}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name={questWaterMet ? "checkmark-circle" : "ellipse-outline"} 
+                  size={20} 
+                  color={questWaterMet ? "#7C9B7A" : "#5A6070"} 
+                  style={{ marginRight: 12 }}
+                />
+                <Text style={[styles.questText, questWaterMet && styles.questTextCompleted]}>Log 1.5L Hydration</Text>
+                <Text style={styles.questProgressText}>{currentWaterAmount} / {questWaterGoal} ml</Text>
+              </TouchableOpacity>
+              <View style={styles.questSeparator} />
+
+              {/* Quest 2 */}
+              <TouchableOpacity 
+                style={styles.questItemRow} 
+                onPress={handleTapFocusQuest}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name={questFocusMet ? "checkmark-circle" : "ellipse-outline"} 
+                  size={20} 
+                  color={questFocusMet ? "#7C9B7A" : "#5A6070"} 
+                  style={{ marginRight: 12 }}
+                />
+                <Text style={[styles.questText, questFocusMet && styles.questTextCompleted]}>Complete 2 Pomodoro Rounds</Text>
+                <Text style={styles.questProgressText}>{(pomodoroStats.roundsToday || 0)} / 2</Text>
+              </TouchableOpacity>
+              <View style={styles.questSeparator} />
+
+              {/* Quest 3 */}
+              <TouchableOpacity 
+                style={styles.questItemRow} 
+                onPress={handleTapFocusQuest}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name={questTasksMet ? "checkmark-circle" : "ellipse-outline"} 
+                  size={20} 
+                  color={questTasksMet ? "#7C9B7A" : "#5A6070"} 
+                  style={{ marginRight: 12 }}
+                />
+                <Text style={[styles.questText, questTasksMet && styles.questTextCompleted]}>Complete 3 Scheduled Tasks</Text>
+                <Text style={styles.questProgressText}>{completedTodayTasks} / 3</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Today's Productivity Widget */}
+          <View style={styles.widgetCard}>
+            <Text style={styles.widgetHeaderTitle}>TODAY'S PRODUCTIVITY</Text>
+            <View style={styles.productivityRow}>
+              {/* Circle Ring */}
+              <View style={[styles.productivityCircle, { borderColor: todayTasks.length > 0 ? '#BA7517' : '#5A6070' }]}>
+                <Text style={styles.productivityCircleText}>
+                  {todayTasks.length > 0 ? Math.round((completedTodayTasks / todayTasks.length) * 100) : 0}%
+                </Text>
+              </View>
+              {/* Right side info */}
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={styles.productivityStatusText}>
+                    {todayTasks.length > 0 && completedTodayTasks === todayTasks.length ? 'Complete' : 'Incomplete'}
+                  </Text>
+                  <TouchableOpacity onPress={() => navigation.navigate('Schedule')}>
+                    <Text style={styles.productivityViewAll}>View All</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.productivityCountText}>
+                  {completedTodayTasks}/{todayTasks.length} Tasks completed
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.productivityHelpText}>
+              {todayTasks.length === 0 
+                ? 'No tasks completed. Add study targets to begin your focus sprint!'
+                : completedTodayTasks === todayTasks.length 
+                  ? 'Stellar performance! You completed today\'s study targets.'
+                  : 'Keep going! Complete your study tasks to level up.'}
+            </Text>
+          </View>
+
+          {/* Today's Tasks Widget */}
+          <View style={styles.widgetCard}>
+            <Text style={styles.widgetHeaderTitle}>TODAY'S TASKS</Text>
+            
+            {todayTasks.length === 0 ? (
+              <Text style={styles.tasksEmptyText}>Clear schedule. A calm mind starts here.</Text>
+            ) : (
+              <View style={{ gap: 8, marginBottom: 12 }}>
+                {todayTasks.map(item => (
+                  <TouchableOpacity 
+                    key={item.id}
+                    style={[styles.taskItemRow, item.completed && styles.taskItemRowCompleted]}
+                    onPress={() => toggleTask(item.id)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.taskCheckbox, item.completed && styles.taskCheckboxChecked]} />
+                    <Text style={[styles.taskTitleText, item.completed && styles.taskTitleTextCompleted]}>
+                      {item.title}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Inline task adder */}
+            <View style={styles.taskAdderBox}>
+              <TextInput
+                style={styles.taskAdderInput}
+                value={newTaskText}
+                onChangeText={setNewTaskText}
+                placeholder="+ Add a new task for today..."
+                placeholderTextColor="#5A6070"
+                onSubmitEditing={handleAddTask}
+              />
+              {newTaskText.trim().length > 0 && (
+                <TouchableOpacity style={styles.taskAdderBtn} onPress={handleAddTask}>
+                  <Ionicons name="arrow-up-circle" size={24} color="#BA7517" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Study Calendar Widget */}
+          <View style={styles.widgetCard}>
+            <Text style={styles.widgetHeaderTitle}>STUDY CALENDAR</Text>
+
+            {/* Calendar Segment Controller */}
+            <View style={styles.calendarSegmentRow}>
+              <TouchableOpacity 
+                style={[styles.calendarSegmentBtn, calendarView === 'weekly' && styles.calendarSegmentBtnActive]} 
+                onPress={() => setCalendarView('weekly')}
+              >
+                <Text style={[styles.calendarSegmentBtnText, calendarView === 'weekly' && styles.calendarSegmentBtnTextActive]}>Weekly</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.calendarSegmentBtn, calendarView === 'monthly' && styles.calendarSegmentBtnActive]} 
+                onPress={() => setCalendarView('monthly')}
+              >
+                <Text style={[styles.calendarSegmentBtnText, calendarView === 'monthly' && styles.calendarSegmentBtnTextActive]}>Monthly Grid</Text>
+              </TouchableOpacity>
+            </View>
+
+            {calendarView === 'weekly' ? (
+              /* Weekly Days list */
+              <View style={styles.weeklyDaysContainer}>
+                {(() => {
+                  const now = new Date();
+                  const startOfWeek = new Date(now);
+                  const currentDay = now.getDay();
+                  const distance = currentDay === 0 ? -6 : 1 - currentDay;
+                  startOfWeek.setDate(now.getDate() + distance);
+
+                  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                  return (
+                    <View style={styles.weeklyDaysRow}>
+                      {weekDays.map((dayName, idx) => {
+                        const cellDate = new Date(startOfWeek);
+                        cellDate.setDate(startOfWeek.getDate() + idx);
+                        const isSelected = cellDate.toDateString() === now.toDateString();
+                        return (
+                          <View key={dayName} style={styles.weeklyDayCol}>
+                            <Text style={styles.weeklyDayNameLabel}>{dayName}</Text>
+                            <View style={[styles.weeklyDayNumberCircle, isSelected && styles.weeklyDayNumberCircleActive]}>
+                              <Text style={[styles.weeklyDayNumberText, isSelected && styles.weeklyDayNumberTextActive]}>
+                                {cellDate.getDate()}
+                              </Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
+              </View>
+            ) : (
+              /* Monthly Calendar Grid */
+              <View style={styles.customCalendarContainer}>
+                <View style={styles.calendarHeader}>
+                  <TouchableOpacity onPress={handlePrevMonth}>
+                    <Ionicons name="chevron-back" size={20} color="#BA7517" />
+                  </TouchableOpacity>
+                  <Text style={styles.calendarHeaderTitle}>
+                    {currentMonthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </Text>
+                  <TouchableOpacity onPress={handleNextMonth}>
+                    <Ionicons name="chevron-forward" size={20} color="#BA7517" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.dayNamesRow}>
+                  {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(day => (
+                    <Text key={day} style={styles.dayNameCell}>{day}</Text>
+                  ))}
+                </View>
+
+                <View style={styles.gridContainer}>
+                  {generateMonthDays(currentMonthDate).map((cell, index) => {
+                    const cellDateStr = cell.date.toISOString().split('T')[0];
+                    const cellTasks = tasks.filter(t => t.date === cellDateStr);
+                    const isToday = cellDateStr === todayStr;
+                    const isSelected = selectedCalendarDate === cellDateStr;
+                    
+                    const completedCount = cellTasks.filter(t => t.completed).length;
+                    const pendingCount = cellTasks.length - completedCount;
+                    
+                    return (
+                      <TouchableOpacity 
+                        key={index} 
+                        style={[
+                          styles.gridCell, 
+                          !cell.isCurrentMonth && styles.gridCellMuted,
+                          isToday && styles.gridCellToday,
+                          isSelected && styles.gridCellSelected
+                        ]}
+                        onPress={() => setSelectedCalendarDate(cellDateStr)}
+                      >
+                        <Text style={[
+                          styles.cellDayText, 
+                          !cell.isCurrentMonth && styles.cellDayTextMuted,
+                          isToday && { color: '#BA7517' }
+                        ]}>
+                          {cell.date.getDate()}
+                        </Text>
+                        {cellTasks.length > 0 && (
+                          <View style={styles.dotsRow}>
+                            {Array.from({ length: Math.min(completedCount, 3) }).map((_, i) => (
+                              <View key={`c-${i}`} style={[styles.dot, styles.dotCompleted]} />
+                            ))}
+                            {Array.from({ length: Math.min(pendingCount, 3) }).map((_, i) => (
+                              <View key={`p-${i}`} style={[styles.dot, styles.dotPending]} />
+                            ))}
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Upcoming Events List */}
+                <Text style={styles.upcomingSectionTitle}>UPCOMING THIS WEEK</Text>
+                {upcomingTasksList.length === 0 ? (
+                  <View style={styles.emptyUpcomingCard}>
+                    <Ionicons name="calendar-outline" size={24} color="#5A6070" style={{ marginBottom: 6 }} />
+                    <Text style={styles.emptyUpcomingText}>No upcoming events this week</Text>
+                  </View>
+                ) : (
+                  <View style={styles.upcomingEventsList}>
+                    {upcomingTasksList.map(item => {
+                      const badgeInfo = getTaskSubjectBadge(item.title);
+                      return (
+                        <TouchableOpacity 
+                          key={item.id} 
+                          style={styles.upcomingEventCard} 
+                          activeOpacity={0.8}
+                          onPress={() => setSelectedCalendarDate(item.date)}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <View style={[styles.eventBadge, { backgroundColor: `${badgeInfo.color}15` }]}>
+                              <Text style={[styles.eventBadgeText, { color: badgeInfo.color }]}>{badgeInfo.name}</Text>
+                            </View>
+                            <Text style={styles.eventTitle}>{item.title}</Text>
+                            <Text style={styles.eventTime}>{formatTaskDate(item.date)}</Text>
+                          </View>
+                          <Ionicons name="chevron-forward" size={16} color="#5A6070" />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {/* Add Study Event Button */}
+                <TouchableOpacity style={styles.addStudyEventBtn}>
+                  <Text style={styles.addStudyEventBtnText}>+ Add Study Event</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
 
           {/* Add Widget Button Row */}
           {isEditingLayout && (
             <TouchableOpacity style={styles.addWidgetBtnRow} onPress={() => setShowAddWidgetModal(true)}>
-              <Ionicons name="add" size={18} color="#C2A878" style={{ marginRight: 6 }} />
+              <Ionicons name="add" size={18} color="#BA7517" style={{ marginRight: 6 }} />
               <Text style={styles.addWidgetBtnRowText}>Add Widgets or Manage Items</Text>
             </TouchableOpacity>
           )}
@@ -1808,7 +1559,7 @@ export default function DashboardScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.loginModalContent}>
-            <Ionicons name="gift" size={54} color="#C2A878" style={{ marginBottom: 12 }} />
+            <Ionicons name="gift" size={54} color="#BA7517" style={{ marginBottom: 12 }} />
             <Text style={styles.loginModalTitle}>Daily Login Reward!</Text>
             <Text style={styles.loginModalStreak}>Streak: Day {loginReward?.streak || 1}</Text>
             <Text style={styles.loginModalDesc}>Here is some fuel to unlock your study targets.</Text>
@@ -1883,7 +1634,7 @@ export default function DashboardScreen() {
             <View style={styles.shieldCard}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="shield-checkmark" size={24} color="#C2A878" style={{ marginRight: 10 }} />
+                  <Ionicons name="shield-checkmark" size={24} color="#BA7517" style={{ marginRight: 10 }} />
                   <View>
                     <Text style={styles.shieldTitle}>Streak Shield</Text>
                     <Text style={styles.shieldSubtitle}>Active: {streaks.shields || 0} available</Text>
@@ -1991,20 +1742,25 @@ export default function DashboardScreen() {
             <Text style={[styles.modalSubtitle, { marginBottom: 16 }]}>Tap to add back widgets to your dashboard.</Text>
             
             <ScrollView style={{ maxHeight: 200, width: '100%', marginBottom: 20 }} contentContainerStyle={{ gap: 8 }}>
-              {dashboardConfig.filter(w => !w.visible).length === 0 ? (
-                <Text style={{ color: '#5A6070', fontSize: 13, textAlign: 'center', paddingVertical: 12 }}>All widgets are active on your dashboard!</Text>
-              ) : (
-                dashboardConfig.filter(w => !w.visible).map(w => (
+              {(() => {
+                const allowedIds = ['quests', 'productivity', 'tasks', 'calendar'];
+                const hidden = dashboardConfig.filter(w => allowedIds.includes(w.id) && !w.visible);
+                if (hidden.length === 0) {
+                  return (
+                    <Text style={{ color: '#5A6070', fontSize: 13, textAlign: 'center', paddingVertical: 12 }}>All widgets are active on your dashboard!</Text>
+                  );
+                }
+                return hidden.map(w => (
                   <TouchableOpacity 
                     key={w.id} 
                     style={styles.addWidgetItemRow} 
                     onPress={() => handleAddWidget(w.id)}
                   >
                     <Text style={styles.addWidgetItemName}>{w.title}</Text>
-                    <Ionicons name="add-circle" size={20} color="#C2A878" />
+                    <Ionicons name="add-circle" size={20} color="#BA7517" />
                   </TouchableOpacity>
-                ))
-              )}
+                ));
+              })()}
             </ScrollView>
 
             <TouchableOpacity 
@@ -2057,7 +1813,7 @@ export default function DashboardScreen() {
                   tooltipStep === 2 ? "flame-outline" : "water-outline"
                 } 
                 size={28} 
-                color="#C2A878" 
+                color="#BA7517" 
               />
               <Text style={styles.tooltipTitle}>
                 {tooltipStep === 1 ? "1. Focus Desk Timer" :
@@ -2113,9 +1869,9 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: 'rgba(194, 168, 120, 0.08)',
+    backgroundColor: 'rgba(186, 117, 23, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.15)',
+    borderColor: 'rgba(186, 117, 23, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2132,7 +1888,7 @@ const styles = StyleSheet.create({
   hamburger: { padding: 4 },
   headerTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18, color: '#F3F1EC' },
   headerStreak: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#171B22', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.03)' },
-  headerStreakText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: '#C2A878', marginLeft: 6 },
+  headerStreakText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: '#BA7517', marginLeft: 6 },
   
   profileCard: { 
     backgroundColor: '#171B22', 
@@ -2140,8 +1896,8 @@ const styles = StyleSheet.create({
     padding: 24, 
     marginBottom: 24, 
     borderWidth: 1, 
-    borderColor: 'rgba(194, 168, 120, 0.15)', // Gold tinted premium border
-    shadowColor: '#C2A878',
+    borderColor: 'rgba(186, 117, 23, 0.15)', // Gold tinted premium border
+    shadowColor: '#BA7517',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.04,
     shadowRadius: 16,
@@ -2151,19 +1907,19 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(194, 168, 120, 0.08)',
+    backgroundColor: 'rgba(186, 117, 23, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.15)',
+    borderColor: 'rgba(186, 117, 23, 0.15)',
     justifyContent: 'center',
     alignItems: 'center'
   },
   name: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, color: '#F3F1EC' },
   bio: { fontFamily: 'PlusJakartaSans_500Medium', color: '#8B92A0', marginTop: 4, fontSize: 13 },
   levelHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  levelText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#C2A878', fontSize: 11, letterSpacing: 0.5 },
+  levelText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#BA7517', fontSize: 11, letterSpacing: 0.5 },
   xpText: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#8B92A0', fontSize: 11 },
   progressBg: { height: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#C2A878' },
+  progressFill: { height: '100%', backgroundColor: '#BA7517' },
 
   section: { marginBottom: 24 },
   sectionTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: '#5A6070', letterSpacing: 1, marginBottom: 12 },
@@ -2212,16 +1968,16 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3
   },
-  scoreGrade: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, color: '#C2A878' },
+  scoreGrade: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, color: '#BA7517' },
   gradeCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(194, 168, 120, 0.1)',
+    backgroundColor: 'rgba(186, 117, 23, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.2)'
+    borderColor: 'rgba(186, 117, 23, 0.2)'
   },
   scoreTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: '#F3F1EC' },
   scoreSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, color: '#8B92A0', marginTop: 2 },
@@ -2233,7 +1989,7 @@ const styles = StyleSheet.create({
   toggleBtn: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
   toggleBtnActive: { backgroundColor: '#1D2430' },
   toggleBtnText: { color: '#8B92A0', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13 },
-  toggleBtnTextActive: { color: '#C2A878' },
+  toggleBtnTextActive: { color: '#BA7517' },
 
   customCalendarContainer: {
     backgroundColor: '#171B22',
@@ -2292,11 +2048,11 @@ const styles = StyleSheet.create({
     opacity: 0.25
   },
   gridCellToday: {
-    backgroundColor: 'rgba(194, 168, 120, 0.08)',
-    borderColor: 'rgba(194, 168, 120, 0.2)'
+    backgroundColor: 'rgba(186, 117, 23, 0.08)',
+    borderColor: 'rgba(186, 117, 23, 0.2)'
   },
   gridCellSelected: {
-    borderColor: '#C2A878',
+    borderColor: '#BA7517',
     backgroundColor: '#171B22'
   },
   cellDayText: {
@@ -2323,7 +2079,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#7C9B7A'
   },
   dotPending: {
-    backgroundColor: '#C2A878'
+    backgroundColor: '#BA7517'
   },
 
   taskCard: { 
@@ -2336,7 +2092,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, 
     borderColor: 'rgba(255,255,255,0.03)',
     borderLeftWidth: 3,
-    borderLeftColor: '#C2A878', // Premium Gold left accent
+    borderLeftColor: '#BA7517', // Premium Gold left accent
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -2348,7 +2104,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#7C9B7A' // Success Sage green left accent
   },
   checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)', marginRight: 12 },
-  checkboxChecked: { backgroundColor: '#C2A878', borderColor: '#C2A878' },
+  checkboxChecked: { backgroundColor: '#BA7517', borderColor: '#BA7517' },
   taskTitle: { fontFamily: 'PlusJakartaSans_500Medium', color: '#F3F1EC', fontSize: 15, flex: 1 },
   taskTitleCompleted: { textDecorationLine: 'line-through', color: '#8B92A0' },
   emptyState: { padding: 32, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', borderStyle: 'dashed', borderRadius: 16 },
@@ -2356,7 +2112,7 @@ const styles = StyleSheet.create({
 
   inlineInputRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
   inlineTaskInput: { flex: 1, backgroundColor: '#0F1115', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, color: '#F3F1EC', fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14, marginRight: 10 },
-  inlineAddBtn: { width: 44, height: 44, backgroundColor: '#C2A878', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  inlineAddBtn: { width: 44, height: 44, backgroundColor: '#BA7517', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
 
   modalOverlay: {
     flex: 1,
@@ -2418,8 +2174,8 @@ const styles = StyleSheet.create({
     marginRight: 10
   },
   modalCheckboxChecked: {
-    backgroundColor: '#C2A878',
-    borderColor: '#C2A878'
+    backgroundColor: '#BA7517',
+    borderColor: '#BA7517'
   },
   modalTaskText: {
     fontFamily: 'PlusJakartaSans_500Medium',
@@ -2451,7 +2207,7 @@ const styles = StyleSheet.create({
   modalAddBtn: {
     width: 44,
     height: 44,
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center'
@@ -2480,7 +2236,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '80%',
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.2)'
+    borderColor: 'rgba(186, 117, 23, 0.2)'
   },
   loginModalTitle: {
     fontFamily: 'PlusJakartaSans_700Bold',
@@ -2491,7 +2247,7 @@ const styles = StyleSheet.create({
   loginModalStreak: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 12,
-    color: '#C2A878',
+    color: '#BA7517',
     marginTop: 4,
     textTransform: 'uppercase',
     letterSpacing: 1
@@ -2505,9 +2261,9 @@ const styles = StyleSheet.create({
     marginBottom: 20
   },
   loginBonusBox: {
-    backgroundColor: 'rgba(194, 168, 120, 0.1)',
+    backgroundColor: 'rgba(186, 117, 23, 0.1)',
     borderWidth: 1.5,
-    borderColor: '#C2A878',
+    borderColor: '#BA7517',
     borderRadius: 16,
     paddingHorizontal: 24,
     paddingVertical: 12,
@@ -2515,11 +2271,11 @@ const styles = StyleSheet.create({
   },
   loginBonusText: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#C2A878',
+    color: '#BA7517',
     fontSize: 22
   },
   loginClaimBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     width: '100%',
     padding: 14,
     borderRadius: 12,
@@ -2556,7 +2312,7 @@ const styles = StyleSheet.create({
   streakPanelVal: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 12,
-    color: '#C2A878',
+    color: '#BA7517',
     marginRight: 6
   },
   reviveBtn: {
@@ -2571,9 +2327,9 @@ const styles = StyleSheet.create({
     fontSize: 9
   },
   shieldCard: {
-    backgroundColor: 'rgba(194, 168, 120, 0.05)',
+    backgroundColor: 'rgba(186, 117, 23, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.15)',
+    borderColor: 'rgba(186, 117, 23, 0.15)',
     padding: 16,
     borderRadius: 16,
     width: '100%'
@@ -2590,7 +2346,7 @@ const styles = StyleSheet.create({
     marginTop: 2
   },
   buyShieldBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8
@@ -2619,7 +2375,7 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     opacity: 0.03
   },
   greetingTitle: {
@@ -2679,12 +2435,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.2)'
+    borderColor: 'rgba(186, 117, 23, 0.2)'
   },
   widgetEditTitle: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 9,
-    color: '#C2A878',
+    color: '#BA7517',
     letterSpacing: 0.5,
     textTransform: 'uppercase'
   },
@@ -2701,14 +2457,14 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: '#C2A878',
-    backgroundColor: 'rgba(194, 168, 120, 0.03)',
+    borderColor: '#BA7517',
+    backgroundColor: 'rgba(186, 117, 23, 0.03)',
     marginTop: 10,
     marginBottom: 30
   },
   addWidgetBtnRowText: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#C2A878',
+    color: '#BA7517',
     fontSize: 13
   },
   addWidgetItemRow: {
@@ -2882,8 +2638,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   sleepRatingBtnActive: {
-    backgroundColor: '#C2A878',
-    borderColor: '#C2A878'
+    backgroundColor: '#BA7517',
+    borderColor: '#BA7517'
   },
   sleepRatingBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
@@ -2891,7 +2647,7 @@ const styles = StyleSheet.create({
     color: '#8B92A0'
   },
   sleepSaveBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -2940,9 +2696,9 @@ const styles = StyleSheet.create({
   sleepTipCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(194, 168, 120, 0.05)',
+    backgroundColor: 'rgba(186, 117, 23, 0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.15)',
+    borderColor: 'rgba(186, 117, 23, 0.15)',
     borderRadius: 14,
     padding: 12,
     marginTop: 16
@@ -2998,7 +2754,7 @@ const styles = StyleSheet.create({
     width: 4,
     height: 24,
     borderRadius: 2,
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     marginRight: 12
   },
   classWidgetSubject: {
@@ -3058,13 +2814,13 @@ const styles = StyleSheet.create({
   },
   quoteCardAuthor: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#C2A878',
+    color: '#BA7517',
     fontSize: 11,
     marginTop: 8,
     alignSelf: 'flex-end'
   },
   quoteTipGlow: {
-    backgroundColor: 'rgba(194, 168, 120, 0.05)',
+    backgroundColor: 'rgba(186, 117, 23, 0.05)',
     borderRadius: 10,
     padding: 8,
     marginTop: 16,
@@ -3123,7 +2879,7 @@ const styles = StyleSheet.create({
   briefingCard: {
     backgroundColor: '#171B22',
     borderWidth: 1.5,
-    borderColor: 'rgba(194, 168, 120, 0.15)',
+    borderColor: 'rgba(186, 117, 23, 0.15)',
     borderRadius: 24,
     padding: 20,
     marginBottom: 20
@@ -3159,7 +2915,7 @@ const styles = StyleSheet.create({
   briefingStatVal: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 18,
-    color: '#C2A878'
+    color: '#BA7517'
   },
   briefingStatLabel: {
     fontFamily: 'PlusJakartaSans_700Bold',
@@ -3190,7 +2946,7 @@ const styles = StyleSheet.create({
   randomDataBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(194, 168, 120, 0.05)',
+    backgroundColor: 'rgba(186, 117, 23, 0.05)',
     borderRadius: 10,
     padding: 8
   },
@@ -3406,11 +3162,11 @@ const styles = StyleSheet.create({
   tooltipCard: {
     backgroundColor: '#171B22',
     borderWidth: 1.5,
-    borderColor: '#C2A878',
+    borderColor: '#BA7517',
     borderRadius: 24,
     padding: 24,
     width: '90%',
-    shadowColor: '#C2A878',
+    shadowColor: '#BA7517',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 16,
@@ -3445,7 +3201,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   tooltipNextBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 12,
@@ -3455,10 +3211,436 @@ const styles = StyleSheet.create({
     color: '#0F1115',
     fontSize: 13,
   },
-  collapsibleWidgetHeader: {
+  mockGreetingCard: {
+    backgroundColor: 'rgba(255, 87, 34, 0.04)',
+    borderColor: 'rgba(255, 87, 34, 0.15)',
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+  },
+  mockGreetingTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 20,
+    color: '#F3F1EC',
+  },
+  mockGreetingSub: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 14,
+    color: '#FF5722',
+    marginTop: 4,
+  },
+  mockStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    gap: 10,
+  },
+  mockStatCard: {
+    flex: 1,
+    backgroundColor: '#171B22',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 16,
+    padding: 14,
+  },
+  mockStatIconBg: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  mockStatValue: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 18,
+    color: '#F3F1EC',
+  },
+  mockStatLabel: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    color: '#5A6070',
+    marginTop: 2,
+  },
+  mockWindDownCard: {
+    backgroundColor: 'rgba(255, 229, 180, 0.03)',
+    borderColor: 'rgba(255, 229, 180, 0.12)',
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 16,
+  },
+  mockWindDownHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mockWindDownEmoji: {
+    fontSize: 24,
+  },
+  mockWindDownTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+    color: '#F3F1EC',
+    lineHeight: 18,
+  },
+  mockWindDownDesc: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    color: '#8B92A0',
+    marginTop: 2,
+  },
+  mockWindDownStartBtn: {
+    backgroundColor: '#BA7517',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  mockWindDownStartBtnText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12,
+    color: '#0F1115',
+  },
+  mockWindDownReadyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#171B22',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 229, 180, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+  },
+  mockWindDownReadyTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+    color: '#FFE5B4',
+  },
+  mockWindDownReadyDesc: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    color: '#8B92A0',
+    marginTop: 2,
+  },
+  widgetCard: {
+    backgroundColor: '#171B22',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.03)',
+    marginBottom: 20,
+  },
+  widgetHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  widgetHeaderTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10.5,
+    color: '#5A6070',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  questItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  questText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    color: '#F3F1EC',
+    flex: 1,
+  },
+  questTextCompleted: {
+    color: '#5A6070',
+    textDecorationLine: 'line-through',
+  },
+  questProgressText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11.5,
+    color: '#8B92A0',
+    marginLeft: 10,
+  },
+  questSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  productivityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 14,
+  },
+  productivityCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  productivityCircleText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+    color: '#F3F1EC',
+  },
+  productivityStatusText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 15,
+    color: '#F3F1EC',
+  },
+  productivityViewAll: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12,
+    color: '#BA7517',
+  },
+  productivityCountText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11.5,
+    color: '#8B92A0',
+    marginTop: 2,
+  },
+  productivityHelpText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12,
+    color: '#8B92A0',
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  tasksEmptyText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: '#5A6070',
+    fontSize: 13.5,
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  taskItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F1115',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  taskItemRowCompleted: {
+    opacity: 0.55,
+  },
+  taskCheckbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.15)',
+    marginRight: 12,
+  },
+  taskCheckboxChecked: {
+    backgroundColor: '#BA7517',
+    borderColor: '#BA7517',
+  },
+  taskTitleText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    color: '#F3F1EC',
+    fontSize: 13.5,
+    flex: 1,
+  },
+  taskTitleTextCompleted: {
+    textDecorationLine: 'line-through',
+    color: '#8B92A0',
+  },
+  taskAdderBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F1115',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+    height: 48,
+    marginTop: 10,
+  },
+  taskAdderInput: {
+    flex: 1,
+    color: '#F3F1EC',
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 13.5,
+    height: '100%',
+  },
+  taskAdderBtn: {
+    padding: 4,
+  },
+  calendarSegmentRow: {
+    flexDirection: 'row',
+    backgroundColor: '#0F1115',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+  },
+  calendarSegmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  calendarSegmentBtnActive: {
+    backgroundColor: '#BA7517',
+  },
+  calendarSegmentBtnText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12.5,
+    color: '#5A6070',
+  },
+  calendarSegmentBtnTextActive: {
+    color: '#0F1115',
+  },
+  weeklyDaysContainer: {
+    paddingVertical: 6,
+  },
+  weeklyDaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  weeklyDayCol: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  weeklyDayNameLabel: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 10.5,
+    color: '#5A6070',
+    marginBottom: 8,
+  },
+  weeklyDayNumberCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  weeklyDayNumberCircleActive: {
+    backgroundColor: '#BA7517',
+  },
+  weeklyDayNumberText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+    color: '#F3F1EC',
+  },
+  weeklyDayNumberTextActive: {
+    color: '#0F1115',
+  },
+  upcomingSectionTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10,
+    color: '#5A6070',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  upcomingEventsList: {
+    gap: 8,
+    marginBottom: 16,
+  },
+  upcomingEventCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F1115',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  eventBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  eventBadgeText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 9.5,
+    textTransform: 'uppercase',
+  },
+  eventTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13.5,
+    color: '#F3F1EC',
+  },
+  eventTime: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    color: '#8B92A0',
+    marginTop: 2,
+  },
+  addStudyEventBtn: {
+    backgroundColor: '#BA7517',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 10,
+  },
+  addStudyEventBtnText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#0F1115',
+    fontSize: 13,
+  },
+  headerCircleBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#171B22',
+  },
+  streakPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF5722',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  streakEmoji: {
+    fontSize: 12,
+  },
+  streakCountText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12,
+    color: '#FFFFFF',
+    marginLeft: 4,
+  },
+  examModeBadge: {
+    backgroundColor: '#E11D48',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  examModeBadgeText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 9.5,
+    color: '#FFFFFF',
+  },
+  emptyUpcomingCard: {
+    backgroundColor: '#171B22',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+    marginVertical: 10,
+  },
+  emptyUpcomingText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    color: '#8B92A0',
   },
 });

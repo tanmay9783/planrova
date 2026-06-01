@@ -70,11 +70,11 @@ function setupPomoEvents(stats) {
     } else {
       startTimer(stats);
       // Auto play sound matching scene on session start
-      if (currentScene === 'rain') playAmbientSound('rain');
-      else if (currentScene === 'midnight') playAmbientSound('lofi');
-      else if (currentScene === 'library') playAmbientSound('cafe');
-      else if (currentScene === 'sprint') playAmbientSound('sprint');
-      else if (currentScene === 'morning') playAmbientSound('morning');
+      if (currentScene === 'rain') playAmbientSound('rain', true);
+      else if (currentScene === 'midnight') playAmbientSound('lofi', true);
+      else if (currentScene === 'library') playAmbientSound('cafe', true);
+      else if (currentScene === 'sprint') playAmbientSound('lofi', true);
+      else if (currentScene === 'morning') playAmbientSound('sitar', true);
     }
   });
 
@@ -162,6 +162,7 @@ function pauseTimer() {
   isRunning = false;
   clearInterval(currentTimer);
   updatePomoUI();
+  stopAmbientSound();
 }
 
 function resetTimer() {
@@ -170,6 +171,7 @@ function resetTimer() {
   mode = 'work';
   secondsRemaining = 1500;
   updatePomoUI();
+  stopAmbientSound();
 }
 
 // Allows setting active task card focus from daily timetable grid
@@ -209,11 +211,12 @@ function showBrowserNotification(title, body) {
 }
 
 const SOUNDS = {
-  rain: 'https://raw.githubusercontent.com/AnthoD/Focus-Sounds/main/sounds/rain.mp3',
-  cafe: 'https://raw.githubusercontent.com/AnthoD/Focus-Sounds/main/sounds/cafe.mp3',
-  lofi: 'https://raw.githubusercontent.com/AnthoD/Focus-Sounds/main/sounds/music.mp3',
-  sprint: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-  morning: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3'
+  rain: '/music/rain.mp3',
+  cafe: '/music/tapri.mp3',
+  lofi: '/music/lofi.mp3',
+  sitar: '/music/sitar.mp3',
+  sprint: '/music/lofi.mp3',
+  morning: '/music/sitar.mp3'
 };
 
 let ambientAudio = null;
@@ -239,16 +242,17 @@ function setupAmbientSounds() {
   }
 }
 
-function playAmbientSound(type) {
+function playAmbientSound(type, forcePlay = false) {
   if (ambientAudio) {
+    if (currentSoundType === type && !forcePlay) {
+      ambientAudio.pause();
+      ambientAudio = null;
+      currentSoundType = null;
+      updateAmbientUI();
+      return;
+    }
     ambientAudio.pause();
     ambientAudio = null;
-  }
-
-  if (currentSoundType === type) {
-    currentSoundType = null;
-    updateAmbientUI();
-    return;
   }
 
   currentSoundType = type;
@@ -310,11 +314,11 @@ function selectFocusScene(scene) {
   updateBodySceneClass();
 
   if (isRunning) {
-    if (scene === 'rain') playAmbientSound('rain');
-    else if (scene === 'midnight') playAmbientSound('lofi');
-    else if (scene === 'library') playAmbientSound('cafe');
-    else if (scene === 'sprint') playAmbientSound('sprint');
-    else if (scene === 'morning') playAmbientSound('morning');
+    if (scene === 'rain') playAmbientSound('rain', true);
+    else if (scene === 'midnight') playAmbientSound('lofi', true);
+    else if (scene === 'library') playAmbientSound('cafe', true);
+    else if (scene === 'sprint') playAmbientSound('lofi', true);
+    else if (scene === 'morning') playAmbientSound('sitar', true);
   }
 }
 

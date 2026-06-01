@@ -13,7 +13,7 @@ import HydrationScreen from '../screens/HydrationScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import NotificationCenterScreen from '../screens/NotificationCenterScreen';
 import AlarmScreen from '../screens/AlarmScreen';
-import AnalyticsScreen from '../screens/AnalyticsScreen';
+import CalculatorScreen from '../screens/CalculatorScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -103,9 +103,9 @@ export default function RootNavigator() {
         options={{ title: 'Daily Alarms & Missions' }} 
       />
       <Stack.Screen 
-        name="AnalyticsWorkspace" 
-        component={AnalyticsScreen} 
-        options={{ title: 'Workspace Analytics', headerShown: false }} 
+        name="CalculatorWorkspace" 
+        component={CalculatorScreen} 
+        options={{ title: 'Study Calculator', headerShown: false }} 
       />
     </Stack.Navigator>
   );

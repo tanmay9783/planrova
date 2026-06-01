@@ -81,7 +81,7 @@ export default function HomeScreen() {
         onPress={() => toggleHabit(item.id)}
         activeOpacity={0.8}
       >
-        <Ionicons name={item.icon || 'flame-outline'} size={18} color={isCompleted ? '#C2A878' : '#8B92A0'} style={{ marginBottom: 6 }} />
+        <Ionicons name={item.icon || 'flame-outline'} size={18} color={isCompleted ? '#BA7517' : '#8B92A0'} style={{ marginBottom: 6 }} />
         <Text style={[styles.habitTitle, isCompleted && styles.habitTitleCompleted]}>{item.name}</Text>
       </TouchableOpacity>
     );
@@ -93,7 +93,7 @@ export default function HomeScreen() {
     if (t.date) {
       markedDates[t.date] = { 
         marked: true, 
-        dotColor: t.completed ? '#7C9B7A' : '#C2A878' 
+        dotColor: t.completed ? '#7C9B7A' : '#BA7517' 
       };
     }
   });
@@ -158,11 +158,11 @@ export default function HomeScreen() {
               calendarBackground: '#171B22',
               textSectionTitleColor: '#8B92A0',
               dayTextColor: '#F3F1EC',
-              todayTextColor: '#C2A878',
+              todayTextColor: '#BA7517',
               selectedDayTextColor: '#0F1115',
               monthTextColor: '#F3F1EC',
-              selectedDayBackgroundColor: '#C2A878',
-              arrowColor: '#C2A878',
+              selectedDayBackgroundColor: '#BA7517',
+              arrowColor: '#BA7517',
               textDayFontFamily: 'PlusJakartaSans_500Medium',
               textMonthFontFamily: 'PlusJakartaSans_700Bold',
               textDayHeaderFontFamily: 'PlusJakartaSans_600SemiBold',
@@ -208,22 +208,22 @@ const styles = StyleSheet.create({
   section: { marginBottom: 24 },
   sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: '#8B92A0', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
   
-  quoteCard: { backgroundColor: '#1D2430', padding: 16, borderRadius: 16, marginBottom: 24, borderLeftWidth: 4, borderLeftColor: '#C2A878' },
+  quoteCard: { backgroundColor: '#1D2430', padding: 16, borderRadius: 16, marginBottom: 24, borderLeftWidth: 4, borderLeftColor: '#BA7517' },
   quoteText: { fontFamily: 'PlusJakartaSans_500Medium', color: '#F3F1EC', fontSize: 14, fontStyle: 'italic', lineHeight: 22 },
-  quoteAuthor: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#C2A878', fontSize: 12, marginTop: 8, textAlign: 'right' },
+  quoteAuthor: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#BA7517', fontSize: 12, marginTop: 8, textAlign: 'right' },
 
   // Habit Card
   habitCard: { backgroundColor: '#171B22', borderRadius: 16, padding: 16, width: 120, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  habitCardCompleted: { backgroundColor: 'rgba(194, 168, 120, 0.1)', borderColor: '#C2A878' },
+  habitCardCompleted: { backgroundColor: 'rgba(186, 117, 23, 0.1)', borderColor: '#BA7517' },
   habitEmoji: { fontSize: 24, marginBottom: 8, opacity: 0.5 },
   habitTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', color: '#F3F1EC', fontSize: 13, textAlign: 'center' },
-  habitTitleCompleted: { color: '#C2A878' },
+  habitTitleCompleted: { color: '#BA7517' },
 
   // Task Card
   taskCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#171B22', borderRadius: 16, padding: 16, marginBottom: 12 },
   taskCardCompleted: { opacity: 0.6 },
   checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)', marginRight: 12 },
-  checkboxChecked: { backgroundColor: '#C2A878', borderColor: '#C2A878' },
+  checkboxChecked: { backgroundColor: '#BA7517', borderColor: '#BA7517' },
   taskTitle: { fontFamily: 'PlusJakartaSans_500Medium', color: '#F3F1EC', fontSize: 15, flex: 1 },
   taskTitleCompleted: { textDecorationLine: 'line-through', color: '#8B92A0' },
   
@@ -233,6 +233,6 @@ const styles = StyleSheet.create({
   // Input
   inputContainer: { flexDirection: 'row', padding: 16, paddingBottom: 32, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', backgroundColor: '#0F1115' },
   taskInput: { flex: 1, backgroundColor: '#171B22', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 14, color: '#F3F1EC', fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, marginRight: 12 },
-  addBtn: { width: 48, height: 48, backgroundColor: '#C2A878', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  addBtn: { width: 48, height: 48, backgroundColor: '#BA7517', borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   addBtnText: { color: '#0F1115', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 24, lineHeight: 28 }
 });

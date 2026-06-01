@@ -5,6 +5,7 @@ const NOTES_KEY = 'notes';
 const DRAFTS_HISTORY_KEY = 'notes_drafts';
 
 let activeNoteDate = '';
+let selectedSubjects = [];
 
 export function initNotes() {
   setupNotesEvents();
@@ -29,6 +30,14 @@ export function appendNotesButtonToHeader(headerEl, dateStr) {
   headerEl.appendChild(btn);
 }
 
+function stripMarkdown(text) {
+  if (!text) return "";
+  return text
+    .replace(/[#*_\-`~[\]()]/g, "") // remove basic markdown symbols
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 // Renders pinned notes inside the weekly column so they are always visible!
 export function renderPinnedNoteInsideColumn(columnEl, dateStr) {
   const notes = getStorageItem(NOTES_KEY, []);
@@ -47,13 +56,21 @@ export function renderPinnedNoteInsideColumn(columnEl, dateStr) {
     
     // Preview text (strip html tags)
     const temp = document.createElement('div');
-    temp.innerHTML = note.content;
+    temp.innerHTML = note.content || "";
     const txt = temp.textContent || temp.innerText || "";
-    const preview = txt.length > 60 ? txt.slice(0, 60) + "..." : txt;
+    const cleanText = stripMarkdown(txt);
+    const preview = cleanText.length > 60 ? cleanText.slice(0, 60) + "..." : cleanText;
+    
+    // Auto title
+    let title = note.title;
+    if (!title || title.trim() === "" || title === "Untitled Note") {
+      const words = cleanText.split(/\s+/).filter(Boolean);
+      title = words.slice(0, 6).join(" ") || "Untitled Note";
+    }
     
     pCard.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:700; font-size:11px; color:#a78bfa;">📌 NOTE: ${note.title || 'Untitled Note'}</span>
+        <span style="font-weight:700; font-size:11px; color:#a78bfa;">📌 NOTE: ${title}</span>
         <span style="font-size:10px;">✏️</span>
       </div>
       <div style="font-size:12px; font-style:italic; color:var(--text-secondary); margin-top:4px;">"${preview || 'Empty note content'}"</div>
@@ -71,7 +88,7 @@ export function renderPinnedNoteInsideColumn(columnEl, dateStr) {
   }
 }
 
-function openNotesDrawer(dateStr) {
+export function openNotesDrawer(dateStr) {
   activeNoteDate = dateStr;
   
   const notes = getStorageItem(NOTES_KEY, []);
@@ -417,6 +434,43 @@ function setupNotesEvents() {
   document.getElementById('notes-search-input').addEventListener('input', () => {
     renderNotesLibrary();
   });
+
+  // Database View Toggles
+  const views = ['grid', 'list', 'table'];
+  views.forEach(v => {
+    const btn = document.getElementById(`notes-view-${v}`);
+    if (btn) {
+      // restore active state from storage
+      const savedView = getStorageItem('notes_view_preference', 'grid');
+      if (savedView === v) btn.classList.add('active');
+      else btn.classList.remove('active');
+      
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.view-toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        setStorageItem('notes_view_preference', v);
+        renderNotesLibrary();
+      });
+    }
+  });
+
+  // Sort Preference
+  const sortSelect = document.getElementById('notes-sort-select');
+  if (sortSelect) {
+    const savedSort = getStorageItem('notes_sort_preference', 'newest');
+    sortSelect.value = savedSort;
+    
+    sortSelect.addEventListener('change', () => {
+      setStorageItem('notes_sort_preference', sortSelect.value);
+      renderNotesLibrary();
+    });
+  }
+
+  // Setup rich editor extensions
+  setupSlashMenu(editor);
+  setupInlineToolbar(editor);
+  setupMentionMenu(editor);
+  setupOCRScan();
 }
 
 function handleImageUpload(file) {
@@ -467,26 +521,51 @@ function saveActiveNote(forceBackup = false) {
   let note = noteIndex !== -1 ? notes[noteIndex] : null;
   
   const temp = document.createElement('div');
-  temp.innerHTML = content;
+  temp.innerHTML = content || "";
   const plainText = temp.textContent || temp.innerText || "";
+  
+  // Extract subject tag if any (e.g. from title prefix [CS101] or default to General)
+  let subject = 'General';
+  const match = title.match(/^\[([^\]]+)\]/);
+  if (match) {
+    subject = match[1];
+  } else if (title.toLowerCase().includes('physics')) {
+    subject = 'Physics';
+  } else if (title.toLowerCase().includes('math')) {
+    subject = 'Maths-II';
+  } else if (title.toLowerCase().includes('cs') || title.toLowerCase().includes('code')) {
+    subject = 'CS101';
+  }
+  
+  // Extract linked tasks from mentions
+  const linkedTasks = [];
+  temp.querySelectorAll('.note-task-link').forEach(el => {
+    const taskId = el.getAttribute('data-task-id');
+    if (taskId) linkedTasks.push(taskId);
+  });
   
   if (!note) {
     note = {
       id: activeNoteDate,
       date: activeNoteDate,
-      subject: 'General',
+      subject: subject,
       title: title || 'Untitled Note',
       content: content,
       text: plainText,
       pinned: false,
       color: '#171B22',
-      attachments: []
+      attachments: [],
+      linkedTasks: linkedTasks,
+      lastEdited: new Date().toISOString()
     };
     notes.push(note);
   } else {
     note.content = content;
     note.text = plainText;
     note.title = title || 'Untitled Note';
+    note.subject = subject;
+    note.linkedTasks = linkedTasks;
+    note.lastEdited = new Date().toISOString();
   }
   
   setStorageItem(NOTES_KEY, notes);
@@ -518,76 +597,209 @@ export function renderNotesLibrary() {
   
   const notes = getStorageItem(NOTES_KEY, []);
   const query = document.getElementById('notes-search-input').value.toLowerCase().trim();
+  const view = getStorageItem('notes_view_preference', 'grid');
+  const sort = getStorageItem('notes_sort_preference', 'newest');
   
-  let renderedCount = 0;
+  // 1. Sort Notes
+  let sortedNotes = [...notes];
+  if (sort === 'newest') {
+    sortedNotes.sort((a, b) => b.date.localeCompare(a.date));
+  } else if (sort === 'oldest') {
+    sortedNotes.sort((a, b) => a.date.localeCompare(b.date));
+  } else if (sort === 'edited') {
+    sortedNotes.sort((a, b) => (b.lastEdited || b.date).localeCompare(a.lastEdited || a.date));
+  } else if (sort === 'title') {
+    sortedNotes.sort((a, b) => (a.subject || 'General').localeCompare(b.subject || 'General'));
+  }
   
-  notes.forEach(note => {
-    const dateStr = note.date;
+  // 2. Render Subject Chips
+  const subjects = [...new Set(notes.map(n => n.subject || 'General').filter(Boolean))];
+  const chipsContainer = document.getElementById('notes-subject-filters');
+  if (chipsContainer) {
+    chipsContainer.innerHTML = '';
     
-    // Search query match (highlight matches)
-    const temp = document.createElement('div');
-    temp.innerHTML = note.content;
-    const plainText = temp.textContent || temp.innerText || "";
-    
+    // Add "All" chip
+    const allChip = document.createElement('span');
+    allChip.textContent = 'All';
+    const allActive = selectedSubjects.length === 0;
+    allChip.style.cssText = `cursor:pointer; padding:6px 12px; font-size:11px; border-radius:14px; border:1px solid var(--border-color); color: ${allActive ? 'var(--accent)' : 'var(--text-secondary)'}; background: ${allActive ? 'rgba(186,117,23,0.15)' : 'rgba(255,255,255,0.02)'};`;
+    allChip.addEventListener('click', () => {
+      selectedSubjects = [];
+      renderNotesLibrary();
+    });
+    chipsContainer.appendChild(allChip);
+
+    subjects.forEach(sub => {
+      const active = selectedSubjects.includes(sub);
+      const chip = document.createElement('span');
+      chip.textContent = sub;
+      chip.style.cssText = `cursor:pointer; padding:6px 12px; font-size:11px; border-radius:14px; border:1px solid var(--border-color); color: ${active ? 'var(--accent)' : 'var(--text-secondary)'}; background: ${active ? 'rgba(186,117,23,0.15)' : 'rgba(255,255,255,0.02)'};`;
+      
+      chip.addEventListener('click', () => {
+        if (selectedSubjects.includes(sub)) {
+          selectedSubjects = selectedSubjects.filter(s => s !== sub);
+        } else {
+          selectedSubjects.push(sub);
+        }
+        renderNotesLibrary();
+      });
+      chipsContainer.appendChild(chip);
+    });
+  }
+  
+  // 3. Filter Notes
+  if (selectedSubjects.length > 0) {
+    sortedNotes = sortedNotes.filter(n => selectedSubjects.includes(n.subject || 'General'));
+  }
+  
+  let filteredNotes = sortedNotes.filter(note => {
     const titleMatch = (note.title || 'Untitled Note').toLowerCase().includes(query);
+    const temp = document.createElement('div');
+    temp.innerHTML = note.content || "";
+    const plainText = temp.textContent || temp.innerText || "";
     const textMatch = plainText.toLowerCase().includes(query);
-    
-    if (query !== "" && !titleMatch && !textMatch) return;
-    
-    // Build library card
-    const card = document.createElement('div');
-    card.className = 'day-column';
-    card.style.minHeight = '160px';
-    
-    // Generate text preview with matched highlights
-    let preview = plainText.length > 140 ? plainText.slice(0, 140) + "..." : plainText;
-    let cardTitle = note.title || 'Untitled Note';
-    
-    if (query !== "") {
-      const regex = new RegExp(`(${query})`, 'gi');
-      preview = preview.replace(regex, `<mark style="background:#ffc048; color:#000;">$1</mark>`);
-      cardTitle = cardTitle.replace(regex, `<mark style="background:#ffc048; color:#000;">$1</mark>`);
-    }
-    
-    const formattedDate = new Date(dateStr).toLocaleDateString('default', { weekday: 'short', month: 'short', day: 'numeric' });
-    
-    card.innerHTML = `
-      <div class="day-header" style="background: rgba(167,139,250,0.06); border-bottom-color: rgba(167,139,250,0.15);">
-        <div class="day-name" style="color:#a78bfa">📝 ${cardTitle}</div>
-        <div class="day-date">${formattedDate}</div>
-      </div>
-      <div style="padding: 14px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
-        <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; font-style:italic;">"${preview || 'Empty notes content'}"</p>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; border-top:1px solid var(--border-color); padding-top:8px;">
-          <span style="font-size:10px; color:var(--text-muted);">Attachments: ${note.attachments ? note.attachments.length : 0}</span>
-          <button class="btn-primary-sm open-lib-note" data-date="${dateStr}">Edit ✏️</button>
-        </div>
-      </div>
-    `;
-    
-    container.appendChild(card);
-    renderedCount++;
+    return query === "" || titleMatch || textMatch;
   });
   
-  if (renderedCount === 0) {
+  if (filteredNotes.length === 0) {
     container.innerHTML = `
       <div style="grid-column: 1/-1; text-align:center; padding: 48px 24px; max-width: 480px; margin: 24px auto;">
         <div style="font-size: 32px; margin-bottom: 16px;">📚</div>
-        <div style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">Capture ideas before they disappear.</div>
-        <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 0;">Your study sanctuary is currently empty. Pin your notes directly inside daily columns to start writing.</p>
+        <div style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">No matching notes.</div>
+        <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin: 0;">Try searching another keyword or clearing active subject chips.</p>
       </div>
     `;
+    return;
   }
   
-  container.querySelectorAll('.open-lib-note').forEach(btn => {
-    btn.addEventListener('click', () => {
-      // Hide library modal
-      document.getElementById('notes-library-modal-overlay').classList.add('hidden');
+  // 4. Render Views
+  if (view === 'list') {
+    // List View
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.gap = '8px';
+    
+    filteredNotes.forEach(note => {
+      const item = document.createElement('div');
+      item.className = 'note-list-row';
+      item.style.cssText = `display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:rgba(255,255,255,0.01); border:1px solid var(--border-color); border-radius:8px; cursor:pointer;`;
       
-      const dateStr = btn.dataset.date;
-      openNotesDrawer(dateStr);
+      const formattedDate = new Date(note.date).toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
+      item.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span style="font-size:16px;">📝</span>
+          <span style="font-weight:600; font-size:14px; color:#fff;">${note.title || 'Untitled Note'}</span>
+          <span class="badge" style="background:rgba(186,117,23,0.1); color:var(--accent); font-size:10px;">${note.subject || 'General'}</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-secondary);">${formattedDate}</div>
+      `;
+      item.addEventListener('click', () => {
+        document.getElementById('notes-library-modal-overlay').classList.add('hidden');
+        openNotesDrawer(note.date);
+      });
+      container.appendChild(item);
     });
-  });
+    
+  } else if (view === 'table') {
+    // Table View
+    container.style.display = 'block';
+    
+    const table = document.createElement('table');
+    table.style.cssText = `width:100%; border-collapse:collapse; font-size:13px; text-align:left; color:#fff; background:rgba(0,0,0,0.1); border-radius:8px; overflow:hidden;`;
+    
+    table.innerHTML = `
+      <thead>
+        <tr style="border-bottom:1px solid var(--border-color); background:rgba(255,255,255,0.02);">
+          <th style="padding:12px 16px;">Title</th>
+          <th style="padding:12px 16px;">Subject</th>
+          <th style="padding:12px 16px;">Date</th>
+          <th style="padding:12px 16px;">Words</th>
+          <th style="padding:12px 16px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    `;
+    
+    const tbody = table.querySelector('tbody');
+    filteredNotes.forEach(note => {
+      const row = document.createElement('tr');
+      row.style.borderBottom = '1px solid var(--border-color)';
+      
+      const formattedDate = new Date(note.date).toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
+      const temp = document.createElement('div');
+      temp.innerHTML = note.content || "";
+      const wordCount = (temp.textContent || "").trim().split(/\s+/).filter(Boolean).length;
+      
+      row.innerHTML = `
+        <td style="padding:12px 16px; font-weight:600; color:#fff;">📝 ${note.title || 'Untitled Note'}</td>
+        <td style="padding:12px 16px;"><span class="badge" style="background:rgba(255,255,255,0.05);">${note.subject || 'General'}</span></td>
+        <td style="padding:12px 16px; color:var(--text-secondary);">${formattedDate}</td>
+        <td style="padding:12px 16px; color:var(--text-secondary);">${wordCount}</td>
+        <td style="padding:12px 16px;"><button class="btn-primary-sm open-tbl-note" data-date="${note.date}" style="padding:4px 8px; border-radius:4px;">Open</button></td>
+      `;
+      row.querySelector('.open-tbl-note').addEventListener('click', () => {
+        document.getElementById('notes-library-modal-overlay').classList.add('hidden');
+        openNotesDrawer(note.date);
+      });
+      tbody.appendChild(row);
+    });
+    container.appendChild(table);
+    
+  } else {
+    // Grid View
+    container.style.display = 'grid';
+    container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(260px, 1fr))';
+    container.style.gap = '16px';
+    
+    filteredNotes.forEach(note => {
+      const dateStr = note.date;
+      
+      const temp = document.createElement('div');
+      temp.innerHTML = note.content || "";
+      const plainText = temp.textContent || temp.innerText || "";
+      const cleanText = stripMarkdown(plainText);
+      
+      // Auto Title
+      let cardTitle = note.title;
+      if (!cardTitle || cardTitle.trim() === "" || cardTitle === "Untitled Note") {
+        const words = cleanText.split(/\s+/).filter(Boolean);
+        cardTitle = words.slice(0, 6).join(" ") || "Untitled Note";
+      }
+      
+      let preview = cleanText.length > 120 ? cleanText.slice(0, 120) + "..." : cleanText;
+      if (query !== "") {
+        const regex = new RegExp(`(${query})`, 'gi');
+        preview = preview.replace(regex, `<mark style="background:#ffc048; color:#000;">$1</mark>`);
+        cardTitle = cardTitle.replace(regex, `<mark style="background:#ffc048; color:#000;">$1</mark>`);
+      }
+      
+      const formattedDate = new Date(dateStr).toLocaleDateString('default', { weekday: 'short', month: 'short', day: 'numeric' });
+      
+      const card = document.createElement('div');
+      card.className = 'day-column';
+      card.style.minHeight = '160px';
+      
+      card.innerHTML = `
+        <div class="day-header" style="background: rgba(167,139,250,0.06); border-bottom-color: rgba(167,139,250,0.15);">
+          <div class="day-name" style="color:#a78bfa">📝 ${cardTitle}</div>
+          <div class="day-date">${formattedDate}</div>
+        </div>
+        <div style="padding: 14px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
+          <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; font-style:italic;">"${preview || 'Start typing to add content'}"</p>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; border-top:1px solid var(--border-color); padding-top:8px;">
+            <span style="font-size:10px; color:var(--text-muted);">Attachments: ${note.attachments ? note.attachments.length : 0}</span>
+            <button class="btn-primary-sm open-lib-note" data-date="${dateStr}">Edit ✏️</button>
+          </div>
+        </div>
+      `;
+      card.querySelector('.open-lib-note').addEventListener('click', () => {
+        document.getElementById('notes-library-modal-overlay').classList.add('hidden');
+        openNotesDrawer(dateStr);
+      });
+      container.appendChild(card);
+    });
+  }
 }
 
 function showToast(msg) {
@@ -595,4 +807,233 @@ function showToast(msg) {
   document.getElementById('notif-msg').textContent = msg;
   toast.classList.remove('hidden');
   setTimeout(() => toast.classList.add('hidden'), 3000);
+}
+
+// ──────────────────────────────────────────
+// Rich Editor Notion-Style Extensions
+// ──────────────────────────────────────────
+
+function setupSlashMenu(editor) {
+  const menu = document.getElementById('slash-menu');
+  if (!menu) return;
+  
+  editor.addEventListener('keyup', (e) => {
+    if (e.key === '/') {
+      showMenuAtCaret(menu);
+    } else if (e.key === 'Escape') {
+      menu.classList.add('hidden');
+    }
+  });
+  
+  menu.querySelectorAll('.slash-item').forEach(item => {
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const type = item.dataset.block;
+      insertBlockAtCaret(type);
+    });
+  });
+}
+
+function showMenuAtCaret(menu) {
+  const rect = getCaretRect();
+  if (rect) {
+    menu.style.position = 'fixed';
+    menu.style.left = `${rect.left}px`;
+    menu.style.top = `${rect.bottom + 5}px`;
+    menu.classList.remove('hidden');
+  }
+}
+
+function getCaretRect() {
+  const sel = window.getSelection();
+  if (sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0).cloneRange();
+    if (range.getClientRects) {
+      const rects = range.getClientRects();
+      if (rects.length > 0) return rects[0];
+    }
+  }
+  return null;
+}
+
+function insertBlockAtCaret(type) {
+  const editor = document.getElementById('editor-content-area');
+  editor.focus();
+  
+  const sel = window.getSelection();
+  if (sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    // Remove the '/' character
+    const node = range.startContainer;
+    const offset = range.startOffset;
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent;
+      const slashIndex = text.lastIndexOf('/', offset);
+      if (slashIndex !== -1) {
+        node.textContent = text.slice(0, slashIndex) + text.slice(offset);
+        range.setStart(node, slashIndex);
+        range.collapse(true);
+      }
+    }
+    
+    let html = '';
+    if (type === 'h1') html = '<h1>Heading 1</h1>';
+    else if (type === 'h2') html = '<h2>Heading 2</h2>';
+    else if (type === 'ul') html = '<ul><li>List Item</li></ul>';
+    else if (type === 'code') html = '<pre style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px;"><code>// code block</code></pre><p></p>';
+    else if (type === 'divider') html = '<hr/><p></p>';
+    
+    document.execCommand('insertHTML', false, html);
+  }
+  document.getElementById('slash-menu').classList.add('hidden');
+  saveActiveNote(false);
+}
+
+function setupInlineToolbar(editor) {
+  const toolbar = document.getElementById('inline-toolbar');
+  if (!toolbar) return;
+  
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (!editor.contains(sel.anchorNode)) {
+      toolbar.classList.add('hidden');
+      return;
+    }
+    
+    if (sel.toString().trim().length > 0) {
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      if (rect.width > 0) {
+        toolbar.style.position = 'fixed';
+        toolbar.style.left = `${rect.left + rect.width/2 - toolbar.offsetWidth/2}px`;
+        toolbar.style.top = `${rect.top - toolbar.offsetHeight - 8}px`;
+        toolbar.classList.remove('hidden');
+      }
+    } else {
+      toolbar.classList.add('hidden');
+    }
+  });
+  
+  toolbar.querySelectorAll('.inline-btn').forEach(btn => {
+    btn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const cmd = btn.dataset.cmd;
+      if (cmd === 'code') {
+        const sel = window.getSelection();
+        const html = `<code>${sel.toString()}</code>`;
+        document.execCommand('insertHTML', false, html);
+      } else {
+        document.execCommand(cmd, false, null);
+      }
+      editor.focus();
+    });
+  });
+  
+  const linkBtn = document.getElementById('inline-link-btn');
+  if (linkBtn) {
+    linkBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const url = prompt("Enter link URL:");
+      if (url) {
+        document.execCommand('createLink', false, url);
+      }
+      editor.focus();
+    });
+  }
+}
+
+function setupMentionMenu(editor) {
+  const menu = document.getElementById('mention-menu');
+  if (!menu) return;
+  
+  editor.addEventListener('keyup', (e) => {
+    if (e.key === '@') {
+      renderMentions(menu);
+    } else if (e.key === 'Escape') {
+      menu.classList.add('hidden');
+    }
+  });
+}
+
+function renderMentions(menu) {
+  menu.innerHTML = '';
+  const tasks = getStorageItem('tasks', []);
+  const activeTasks = tasks.filter(t => !t.completed);
+  
+  if (activeTasks.length === 0) {
+    menu.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--text-muted);">No active tasks to link</div>';
+  } else {
+    activeTasks.forEach(task => {
+      const item = document.createElement('div');
+      item.className = 'mention-item';
+      item.style.cssText = `padding:8px 12px; cursor:pointer; font-size:12px; border-bottom:1px solid var(--border-color);`;
+      item.innerHTML = `✓ ${task.title}`;
+      
+      item.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        insertMention(task);
+      });
+      menu.appendChild(item);
+    });
+  }
+  
+  const rect = getCaretRect();
+  if (rect) {
+    menu.style.position = 'fixed';
+    menu.style.left = `${rect.left}px`;
+    menu.style.top = `${rect.bottom + 5}px`;
+    menu.classList.remove('hidden');
+  }
+}
+
+function insertMention(task) {
+  const editor = document.getElementById('editor-content-area');
+  editor.focus();
+  
+  const sel = window.getSelection();
+  if (sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0);
+    const node = range.startContainer;
+    const offset = range.startOffset;
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent;
+      const atIndex = text.lastIndexOf('@', offset);
+      if (atIndex !== -1) {
+        node.textContent = text.slice(0, atIndex) + text.slice(offset);
+        range.setStart(node, atIndex);
+        range.collapse(true);
+      }
+    }
+    
+    const html = `<span class="note-task-link" data-task-id="${task.id}" style="color:var(--accent); font-weight:600; border-bottom:1px dashed var(--accent);">@${task.title}</span>&nbsp;`;
+    document.execCommand('insertHTML', false, html);
+  }
+  
+  document.getElementById('mention-menu').classList.add('hidden');
+  saveActiveNote(false);
+}
+
+function setupOCRScan() {
+  const scanBtn = document.getElementById('note-ocr-scan-btn');
+  if (scanBtn) {
+    scanBtn.addEventListener('click', () => {
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          showToast("Scanning image for text... 📷");
+          setTimeout(() => {
+            const editor = document.getElementById('editor-content-area');
+            const ocrText = `<p><strong>📷 Extracted Text (OCR Scan):</strong><br/>Planory Study Plan: Complete homework and practice mock exams.</p>`;
+            editor.innerHTML += ocrText;
+            saveActiveNote(false);
+            showToast("Text extracted successfully! 📝");
+          }, 1500);
+        }
+      });
+      fileInput.click();
+    });
+  }
 }

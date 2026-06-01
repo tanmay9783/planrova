@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   input: { fontFamily: 'PlusJakartaSans_500Medium', color: '#F3F1EC', fontSize: 15, minHeight: 80, textAlignVertical: 'top' },
   actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
   iconBtn: { backgroundColor: '#1D2430', padding: 10, borderRadius: 10 },
-  addBtn: { backgroundColor: '#C2A878', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10 },
+  addBtn: { backgroundColor: '#BA7517', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 10 },
   addBtnText: { color: '#0F1115', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14 },
 
   helperText: { fontFamily: 'PlusJakartaSans_500Medium', color: '#8B92A0', fontSize: 13, textAlign: 'center', marginTop: 24, marginBottom: 32 },

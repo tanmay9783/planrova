@@ -27,6 +27,7 @@ import { setAudioModeAsync, createAudioPlayer } from 'expo-audio';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Notifications from 'expo-notifications';
 import { requestNotificationPermission } from '../utils/notifications';
+import { Accelerometer, Pedometer } from 'expo-sensors';
 
 const { width, height } = Dimensions.get('window');
 
@@ -38,12 +39,8 @@ const SOUND_ASSETS = {
 };
 
 const BUILT_IN_SOUNDS = [
-  { id: 'beep', name: 'Default Beep (Mixkit)', type: 'default', uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav' },
-  { id: 'classic', name: 'Classic Bell (Online)', type: 'built-in', uri: 'https://assets.mixkit.co/active_storage/sfx/1006/1006-600.wav' },
-  { id: 'chimes', name: 'Gentle Chimes (Online)', type: 'built-in', uri: 'https://assets.mixkit.co/active_storage/sfx/911/911-600.wav' },
-  { id: 'rooster', name: 'Digital Rooster (Online)', type: 'built-in', uri: 'https://assets.mixkit.co/active_storage/sfx/907/907-600.wav' },
-  { id: 'sitar', name: 'Zen Flute (Local)', type: 'local', assetKey: 'sitar' },
   { id: 'lofi', name: 'Calm Lofi (Local)', type: 'local', assetKey: 'lofi' },
+  { id: 'sitar', name: 'Zen Flute (Local)', type: 'local', assetKey: 'sitar' },
   { id: 'rain', name: 'Soothing Rain (Local)', type: 'local', assetKey: 'rain' },
   { id: 'tapri', name: 'Soft Cafe (Local)', type: 'local', assetKey: 'tapri' },
 ];
@@ -58,6 +55,40 @@ const MOTIVATIONAL_SENTENCES = [
 
 export default function AlarmScreen() {
   const userId = auth.currentUser ? auth.currentUser.uid : 'guest';
+  const [activeTab, setActiveTab] = useState('alarm'); // 'alarm' or 'sleep'
+
+  const formatTimeWithAmPm = (timeStr) => {
+    if (!timeStr) return { time: '12:00', ampm: 'AM' };
+    const [hStr, mStr] = timeStr.split(':');
+    const h = parseInt(hStr);
+    const m = parseInt(mStr);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const displayHour = h % 12 === 0 ? 12 : h % 12;
+    const displayMin = m.toString().padStart(2, '0');
+    return {
+      time: `${displayHour}:${displayMin}`,
+      ampm
+    };
+  };
+
+  const getLegacyWakeCountdown = () => {
+    if (!alarms.wakeEnabled || !alarms.wakeTime) return 'Alarm disabled';
+    const now = new Date();
+    const [h, m] = alarms.wakeTime.split(':').map(Number);
+    const target = new Date(now);
+    target.setHours(h, m, 0, 0);
+    if (target <= now) {
+      target.setDate(target.getDate() + 1);
+    }
+    const diffMs = target - now;
+    const diffMins = Math.round(diffMs / 60000);
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    if (hours === 0) {
+      return `in ${mins} min`;
+    }
+    return `in ${hours} hr ${mins} min`;
+  };
 
   // Firestore sync for Alarms Configuration
   const [alarms, setAlarms] = useFirestoreData('daily_alarms', {
@@ -76,6 +107,7 @@ export default function AlarmScreen() {
     medicationEnabled: false,
     windDownTime: '21:00',
     windDownEnabled: true,
+    customRingtones: []
   });
 
   // Firestore sync for Sleep Logs
@@ -91,7 +123,7 @@ export default function AlarmScreen() {
       enabled: true,
       mission: 'math',
       days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-      ringtone: { type: 'default', name: 'Default Beep (Mixkit)', uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav' }
+      ringtone: { type: 'local', name: 'Calm Lofi (Local)', assetKey: 'lofi' }
     }
   ]);
 
@@ -104,17 +136,20 @@ export default function AlarmScreen() {
 
   // ── Schedule all enabled alarms as system notifications ──────────────────
   // This makes alarms work even when the app is closed/backgrounded.
-  const scheduleAlarmNotifications = async (list) => {
+  // ── Schedule all enabled alarms as system notifications ──────────────────
+  // This makes alarms work even when the app is closed/backgrounded.
+  const scheduleAlarmNotifications = async (list, legacyWakeAlarm) => {
     // Cancel all previously scheduled alarm notifications
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const notif of scheduled) {
-      if (notif.content.data?.type === 'alarm') {
+      if (notif.content.data?.type === 'alarm' || notif.content.data?.type === 'legacy-alarm') {
         await Notifications.cancelScheduledNotificationAsync(notif.identifier);
       }
     }
 
     const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
+    // 1. Schedule custom alarms from alarmsList
     for (const alarm of list) {
       if (!alarm.enabled) continue;
       const [h, m] = alarm.time.split(':').map(Number);
@@ -158,14 +193,144 @@ export default function AlarmScreen() {
         });
       }
     }
+
+    // 2. Schedule legacy wake alarm if enabled
+    if (legacyWakeAlarm && legacyWakeAlarm.wakeEnabled && legacyWakeAlarm.wakeTime) {
+      const [h, m] = legacyWakeAlarm.wakeTime.split(':').map(Number);
+      // Schedule legacy alarm for every day of the week
+      for (const day of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: `⏰ Wake Up — ${legacyWakeAlarm.wakeTime}`,
+            body: legacyWakeAlarm.wakeMission !== 'none'
+              ? `Wake up mission: ${legacyWakeAlarm.wakeMission.toUpperCase()}. Complete your task to earn XP!`
+              : 'Time to wake up and start your day, grinder!',
+            data: { type: 'alarm', alarmId: 'legacy-wake' },
+            sound: true,
+          },
+          trigger: {
+            type: 'weekly',
+            channelId: 'default',
+            weekday: dayMap[day] + 1, // 1=Sun...7=Sat
+            hour: h,
+            minute: m,
+          },
+        });
+      }
+    }
   };
 
-  // Re-schedule notifications whenever alarm list changes
-  useEffect(() => {
-    if (alarmsList && alarmsList.length > 0) {
-      scheduleAlarmNotifications(alarmsList);
+  // Re-schedule routine notifications whenever routine configs change
+  const scheduleRoutineNotifications = async (config) => {
+    // Cancel existing routine notifications
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notif of scheduled) {
+      if (['water', 'meal', 'medication', 'winddown'].includes(notif.content.data?.type)) {
+        await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+      }
     }
-  }, [alarmsList]);
+
+    // 1. Schedule Water Reminders
+    if (config.waterEnabled && config.waterTimes) {
+      for (const timeStr of config.waterTimes) {
+        const [h, m] = timeStr.split(':').map(Number);
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "💧 Drink Water Reminder",
+            body: "Keep your hydration streak active! Take a glass of water now.",
+            data: { type: 'water' },
+            sound: true,
+          },
+          trigger: {
+            type: 'daily',
+            channelId: 'default',
+            hour: h,
+            minute: m,
+          },
+        });
+      }
+    }
+
+    // 2. Schedule Meals (Lunch Break)
+    if (config.mealsEnabled && config.mealLunch) {
+      const [h, m] = config.mealLunch.split(':').map(Number);
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "🍲 Lunch Break Reminder",
+          body: "Time for a healthy meal. Take a break from study!",
+          data: { type: 'meal' },
+          sound: true,
+        },
+        trigger: {
+          type: 'daily',
+          channelId: 'default',
+          hour: h,
+          minute: m,
+        },
+      });
+    }
+
+    // 3. Schedule Medication (Vitamins)
+    if (config.medicationEnabled && config.medicationTime) {
+      const [h, m] = config.medicationTime.split(':').map(Number);
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `💊 Vitamins Reminder — ${config.medicationName || 'Meds'}`,
+          body: `Time to take your ${config.medicationName || 'dosage'} (${config.medicationDose || '1 tablet'}).`,
+          data: { type: 'medication' },
+          sound: true,
+        },
+        trigger: {
+          type: 'daily',
+          channelId: 'default',
+          hour: h,
+          minute: m,
+        },
+      });
+    }
+
+    // 4. Schedule Wind Down
+    if (config.windDownEnabled && config.windDownTime) {
+      const [h, m] = config.windDownTime.split(':').map(Number);
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "🌙 Cosmic Wind-Down Time",
+          body: "Bhai, study is done for today. Time to rate your day and carry over tasks.",
+          data: { type: 'winddown' },
+          sound: true,
+        },
+        trigger: {
+          type: 'daily',
+          channelId: 'default',
+          hour: h,
+          minute: m,
+        },
+      });
+    }
+  };
+
+  // Re-schedule notifications whenever alarm list or legacy wake alarm changes
+  useEffect(() => {
+    scheduleAlarmNotifications(alarmsList, alarms);
+  }, [alarmsList, alarms.wakeTime, alarms.wakeEnabled, alarms.wakeMission]);
+
+  // Re-schedule routine notifications whenever routine configs change
+  useEffect(() => {
+    if (alarms) {
+      scheduleRoutineNotifications(alarms);
+    }
+  }, [
+    alarms.waterEnabled,
+    alarms.waterTimes,
+    alarms.mealsEnabled,
+    alarms.mealLunch,
+    alarms.medicationEnabled,
+    alarms.medicationTime,
+    alarms.medicationName,
+    alarms.medicationDose,
+    alarms.windDownEnabled,
+    alarms.windDownTime
+  ]);
 
   // Modal & Form States for Custom Alarms
   const [showEditModal, setShowEditModal] = useState(false);
@@ -175,10 +340,59 @@ export default function AlarmScreen() {
   const [editMission, setEditMission] = useState('none');
   const [editDays, setEditDays] = useState(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
   const [editRingtone, setEditRingtone] = useState({
-    type: 'default',
-    name: 'Default Beep (Mixkit)',
-    uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav'
+    type: 'local',
+    name: 'Calm Lofi (Local)',
+    assetKey: 'lofi'
   });
+
+  const hourScrollRef = useRef(null);
+  const minScrollRef = useRef(null);
+
+  const HOURS = Array.from({ length: 24 }, (_, i) => i.toString().padStart(2, '0'));
+  const MINUTES = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+
+  useEffect(() => {
+    if (showEditModal) {
+      setTimeout(() => {
+        const h = parseInt(editTimeHour) || 0;
+        const m = parseInt(editTimeMin) || 0;
+        if (hourScrollRef.current) {
+          hourScrollRef.current.scrollTo({ y: h * 60, animated: false });
+        }
+        if (minScrollRef.current) {
+          minScrollRef.current.scrollTo({ y: m * 60, animated: false });
+        }
+      }, 100);
+    }
+  }, [showEditModal]);
+
+  const handleHourScrollEnd = (event) => {
+    const y = event.nativeEvent.contentOffset.y;
+    const index = Math.round(y / 60);
+    const clampedIndex = Math.max(0, Math.min(index, 23));
+    setEditTimeHour(clampedIndex.toString().padStart(2, '0'));
+  };
+
+  const handleMinScrollEnd = (event) => {
+    const y = event.nativeEvent.contentOffset.y;
+    const index = Math.round(y / 60);
+    const clampedIndex = Math.max(0, Math.min(index, 59));
+    setEditTimeMin(clampedIndex.toString().padStart(2, '0'));
+  };
+
+  const selectHourIndex = (index) => {
+    setEditTimeHour(index.toString().padStart(2, '0'));
+    if (hourScrollRef.current) {
+      hourScrollRef.current.scrollTo({ y: index * 60, animated: true });
+    }
+  };
+
+  const selectMinIndex = (index) => {
+    setEditTimeMin(index.toString().padStart(2, '0'));
+    if (minScrollRef.current) {
+      minScrollRef.current.scrollTo({ y: index * 60, animated: true });
+    }
+  };
 
   // Screen UI States
   const [showRingingModal, setShowRingingModal] = useState(false);
@@ -291,6 +505,64 @@ export default function AlarmScreen() {
     return () => clearInterval(interval);
   }, [alarmsList, alarms]);
 
+  // Listen for background & foreground notifications
+  useEffect(() => {
+    // 1. Listen for notifications received in foreground
+    const foregroundSubscription = Notifications.addNotificationReceivedListener(notification => {
+      const data = notification.request.content.data;
+      if (data) {
+        if (data.type === 'alarm') {
+          const alarmId = data.alarmId;
+          if (alarmId === 'legacy-wake') {
+            if (!showRingingModal) {
+              triggerAlarm('wake', null);
+            }
+          } else {
+            const matchingAlarm = alarmsList.find(a => a.id === alarmId);
+            if (!showRingingModal) {
+              triggerAlarm('wake', matchingAlarm || null);
+            }
+          }
+        } else if (['water', 'meal', 'medication', 'winddown'].includes(data.type)) {
+          const alarmType = data.type === 'medication' ? 'meds' : data.type;
+          if (!showRingingModal) {
+            triggerAlarm(alarmType);
+          }
+        }
+      }
+    });
+
+    // 2. Listen for notification clicks (response received)
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      if (data) {
+        if (data.type === 'alarm') {
+          const alarmId = data.alarmId;
+          if (alarmId === 'legacy-wake') {
+            if (!showRingingModal) {
+              triggerAlarm('wake', null);
+            }
+          } else {
+            const matchingAlarm = alarmsList.find(a => a.id === alarmId);
+            if (!showRingingModal) {
+              triggerAlarm('wake', matchingAlarm || null);
+            }
+          }
+        } else if (['water', 'meal', 'medication', 'winddown'].includes(data.type)) {
+          const alarmType = data.type === 'medication' ? 'meds' : data.type;
+          if (!showRingingModal) {
+            triggerAlarm(alarmType);
+          }
+        }
+      }
+    });
+
+    return () => {
+      foregroundSubscription.remove();
+      responseSubscription.remove();
+    };
+  }, [alarmsList, showRingingModal]);
+
   const formatCountdown = (diffMs) => {
     if (!diffMs || diffMs === Infinity) return '';
     const diffMins = Math.round(diffMs / 60000);
@@ -317,12 +589,160 @@ export default function AlarmScreen() {
     setShowEditModal(true);
   };
 
+  const handleEditHeroAlarm = () => {
+    setEditingAlarm('hero');
+    const [h, m] = alarms.wakeTime.split(':');
+    setEditTimeHour(h || '06');
+    setEditTimeMin(m || '30');
+    setEditMission(alarms.wakeMission || 'math');
+    setEditDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    setEditRingtone(alarms.wakeRingtone || {
+      type: 'local',
+      name: 'Calm Lofi (Local)',
+      assetKey: 'lofi'
+    });
+    setShowEditModal(true);
+  };
+
+  const [showRoutineModal, setShowRoutineModal] = useState(false);
+  const [selectedRoutine, setSelectedRoutine] = useState(''); // 'water', 'meal', 'medication'
+  
+  const [routineWaterTimesStr, setRoutineWaterTimesStr] = useState('09:00, 14:00, 19:00');
+  const [routineBreakfastTime, setRoutineBreakfastTime] = useState('08:30');
+  const [routineLunchTime, setRoutineLunchTime] = useState('13:00');
+  const [routineDinnerTime, setRoutineDinnerTime] = useState('20:30');
+  const [routineMedsTime, setRoutineMedsTime] = useState('21:30');
+  const [routineMedsName, setRoutineMedsName] = useState('Vitamin B12');
+  const [routineMedsDose, setRoutineMedsDose] = useState('1 tablet');
+
+  const handleEditRoutinePress = (type) => {
+    setSelectedRoutine(type);
+    if (type === 'water') {
+      setRoutineWaterTimesStr((alarms.waterTimes || []).join(', '));
+    } else if (type === 'meal') {
+      setRoutineBreakfastTime(alarms.mealBreakfast || '08:30');
+      setRoutineLunchTime(alarms.mealLunch || '13:00');
+      setRoutineDinnerTime(alarms.mealDinner || '20:30');
+    } else if (type === 'medication') {
+      setRoutineMedsTime(alarms.medicationTime || '21:30');
+      setRoutineMedsName(alarms.medicationName || 'Vitamin B12');
+      setRoutineMedsDose(alarms.medicationDose || '1 tablet');
+    }
+    setShowRoutineModal(true);
+  };
+
+  const handleSaveRoutine = () => {
+    if (selectedRoutine === 'water') {
+      const times = routineWaterTimesStr.split(',')
+        .map(t => t.trim())
+        .filter(t => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(t));
+      
+      if (times.length === 0) {
+        Alert.alert("Invalid Times", "Please specify at least one valid 24-hour time format (e.g. 09:00, 14:30).");
+        return;
+      }
+      setAlarms({
+        ...alarms,
+        waterTimes: times
+      });
+      Alert.alert("Water Reminder Saved 🎉", `Hydration scheduled for: ${times.join(', ')}.`);
+    } else if (selectedRoutine === 'meal') {
+      const validateTime = (t) => /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(t);
+      if (!validateTime(routineBreakfastTime) || !validateTime(routineLunchTime) || !validateTime(routineDinnerTime)) {
+        Alert.alert("Invalid Times", "All meal times must be in 24-hour format (e.g., 13:00).");
+        return;
+      }
+      setAlarms({
+        ...alarms,
+        mealBreakfast: routineBreakfastTime,
+        mealLunch: routineLunchTime,
+        mealDinner: routineDinnerTime
+      });
+      Alert.alert("Meal Times Saved 🎉", "Breakfast, lunch, and dinner reminder schedules updated.");
+    } else if (selectedRoutine === 'medication') {
+      if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(routineMedsTime)) {
+        Alert.alert("Invalid Time", "Medication time must be in 24-hour format (e.g., 21:30).");
+        return;
+      }
+      if (!routineMedsName.trim()) {
+        Alert.alert("Invalid Name", "Please specify a medication name.");
+        return;
+      }
+      setAlarms({
+        ...alarms,
+        medicationTime: routineMedsTime,
+        medicationName: routineMedsName,
+        medicationDose: routineMedsDose
+      });
+      Alert.alert("Vitamins Reminder Saved 🎉", `Vitamins schedule set for ${routineMedsTime}.`);
+    }
+    setShowRoutineModal(false);
+  };
+
   // Animations
   const soundRef = useRef(null);
+  const previewPlayerRef = useRef(null);
+  const lastTriggeredMinRef = useRef('');
   const ringScale = useRef(new Animated.Value(1)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const progressTimerRef = useRef(null);
   const audioIntervalRef = useRef(null);
+
+  // Audio ringtone preview system
+  const playRingtonePreview = async (tone) => {
+    try {
+      if (previewPlayerRef.current) {
+        try {
+          previewPlayerRef.current.pause();
+        } catch (e) {}
+        previewPlayerRef.current = null;
+      }
+
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+      });
+
+      let source = SOUND_ASSETS.lofi;
+      if (tone.type === 'file' && tone.uri) {
+        source = tone.uri;
+      } else if (tone.type === 'local' && tone.assetKey && SOUND_ASSETS[tone.assetKey]) {
+        source = SOUND_ASSETS[tone.assetKey];
+      } else if (tone.uri) {
+        source = tone.uri;
+      }
+
+      const player = createAudioPlayer(source);
+      player.volume = 0.5;
+      player.play();
+      previewPlayerRef.current = player;
+
+      setTimeout(() => {
+        if (previewPlayerRef.current === player) {
+          try {
+            player.pause();
+          } catch (e) {}
+          previewPlayerRef.current = null;
+        }
+      }, 4000);
+    } catch (e) {
+      console.warn("Ringtone preview play error:", e);
+    }
+  };
+
+  const selectRingtoneWithPreview = (tone) => {
+    setEditRingtone(tone);
+    playRingtonePreview(tone);
+  };
+
+  const stopRingtonePreview = () => {
+    if (previewPlayerRef.current) {
+      try {
+        previewPlayerRef.current.pause();
+      } catch (e) {}
+      previewPlayerRef.current = null;
+    }
+  };
 
   // Entrance animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -342,6 +762,11 @@ export default function AlarmScreen() {
       const currentHourMin = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       const currentDay = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()];
       
+      // If we already triggered for this minute, skip checking
+      if (lastTriggeredMinRef.current === currentHourMin) {
+        return;
+      }
+
       // Multiple Custom Alarms Check
       const matchingAlarm = alarmsList.find(alarm => 
         alarm.enabled && 
@@ -350,18 +775,21 @@ export default function AlarmScreen() {
       );
 
       if (matchingAlarm && !showRingingModal) {
+        lastTriggeredMinRef.current = currentHourMin;
         triggerAlarm('wake', matchingAlarm);
       }
       // Legacy Wake Alarm Check (fallback)
       else if (alarms.wakeEnabled && currentHourMin === alarms.wakeTime && !showRingingModal) {
+        lastTriggeredMinRef.current = currentHourMin;
         triggerAlarm('wake');
       }
       
       // Water Alarms Check
-      if (alarms.waterEnabled && alarms.waterTimes.includes(currentHourMin) && !showRingingModal) {
+      else if (alarms.waterEnabled && alarms.waterTimes.includes(currentHourMin) && !showRingingModal) {
+        lastTriggeredMinRef.current = currentHourMin;
         triggerAlarm('water');
       }
-    }, 30000); // Check every 30 seconds
+    }, 1000); // Check every second for sub-second precision!
 
     return () => clearInterval(clockInterval);
   }, [alarms, alarmsList, showRingingModal]);
@@ -374,10 +802,19 @@ export default function AlarmScreen() {
         shouldPlayInBackground: true,
       });
 
-      // Retrieve alarm-specific ringtone or use default
-      let source = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav';
+      // Retrieve alarm-specific ringtone or use default local lofi
+      let source = SOUND_ASSETS.lofi;
       if (activeRingingAlarm && activeRingingAlarm.ringtone) {
         const rt = activeRingingAlarm.ringtone;
+        if (rt.type === 'file' && rt.uri) {
+          source = rt.uri;
+        } else if (rt.type === 'local' && rt.assetKey && SOUND_ASSETS[rt.assetKey]) {
+          source = SOUND_ASSETS[rt.assetKey];
+        } else if (rt.uri) {
+          source = rt.uri;
+        }
+      } else if (alarms.wakeRingtone) {
+        const rt = alarms.wakeRingtone;
         if (rt.type === 'file' && rt.uri) {
           source = rt.uri;
         } else if (rt.type === 'local' && rt.assetKey && SOUND_ASSETS[rt.assetKey]) {
@@ -461,6 +898,62 @@ export default function AlarmScreen() {
       stopAlarmSound();
     };
   }, [showRingingModal, activeRingingAlarm]);
+
+  // Shake / Walk sensors subscription in Ringing Modal
+  useEffect(() => {
+    let accelSubscription = null;
+    let pedoSubscription = null;
+
+    if (showRingingModal && ringAlarmType === 'wake') {
+      const activeMission = activeRingingAlarm ? (activeRingingAlarm.mission || 'none') : (alarms.wakeMission || 'none');
+
+      if (activeMission === 'shake') {
+        let lastUpdate = 0;
+        const SHAKE_THRESHOLD = 2.2; // G-force threshold
+
+        Accelerometer.isAvailableAsync().then(available => {
+          if (available) {
+            Accelerometer.setUpdateInterval(100);
+            accelSubscription = Accelerometer.addListener(data => {
+              const { x, y, z } = data;
+              const acceleration = Math.sqrt(x*x + y*y + z*z);
+              
+              if (acceleration > SHAKE_THRESHOLD) {
+                const curTime = Date.now();
+                if ((curTime - lastUpdate) > 500) {
+                  lastUpdate = curTime;
+                  handleShakeSensorTrigger();
+                }
+              }
+            });
+          }
+        });
+      } else if (activeMission === 'walking') {
+        Pedometer.isAvailableAsync().then(available => {
+          if (available) {
+            let initialStepCount = -1;
+            pedoSubscription = Pedometer.watchStepCount(result => {
+              if (initialStepCount === -1) {
+                initialStepCount = result.steps;
+              } else {
+                const diff = result.steps - initialStepCount;
+                if (diff > 0) {
+                  for (let i = 0; i < diff; i++) {
+                    handleStepWalkTrigger();
+                  }
+                }
+              }
+            });
+          }
+        });
+      }
+    }
+
+    return () => {
+      if (accelSubscription) accelSubscription.remove();
+      if (pedoSubscription) pedoSubscription.remove();
+    };
+  }, [showRingingModal, ringAlarmType, activeRingingAlarm, alarms.wakeMission]);
 
   const triggerAlarm = (type = 'wake', alarmObject = null) => {
     setRingAlarmType(type);
@@ -633,7 +1126,15 @@ export default function AlarmScreen() {
 
     const timeStr = `${editTimeHour.padStart(2, '0')}:${editTimeMin.padStart(2, '0')}`;
     
-    if (editingAlarm) {
+    if (editingAlarm === 'hero') {
+      setAlarms({
+        ...alarms,
+        wakeTime: timeStr,
+        wakeMission: editMission,
+        wakeRingtone: editRingtone
+      });
+      Alert.alert("Wake Up Alarm Saved 🎉", `Hero Wake Up alarm set to ring at ${timeStr}.`);
+    } else if (editingAlarm) {
       const updated = alarmsList.map(a => a.id === editingAlarm.id ? {
         ...a,
         time: timeStr,
@@ -656,6 +1157,7 @@ export default function AlarmScreen() {
       Alert.alert("Alarm Set 🎉", `New alarm added for ${timeStr}.`);
     }
     
+    stopRingtonePreview();
     setShowEditModal(false);
     setEditingAlarm(null);
   };
@@ -695,11 +1197,19 @@ export default function AlarmScreen() {
         const file = result.assets && result.assets.length > 0 ? result.assets[0] : result;
         const uri = file.uri;
         if (uri) {
-          setEditRingtone({
+          const tone = {
+            id: 'custom-' + Date.now(),
             type: 'file',
             name: file.name || 'Custom Audio File',
             uri: uri
+          };
+          const currentCustomList = alarms.customRingtones || [];
+          const updatedCustomList = [...currentCustomList.filter(t => t.uri !== uri), tone];
+          setAlarms({
+            ...alarms,
+            customRingtones: updatedCustomList
           });
+          selectRingtoneWithPreview(tone);
         }
       }
     } catch (e) {
@@ -798,376 +1308,328 @@ export default function AlarmScreen() {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh} 
-            colors={['#C2A878']} 
-            tintColor="#C2A878" 
+            colors={['#BA7517']} 
+            tintColor="#BA7517" 
           />
         }
       >
         
         {/* Alarms Header */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.title}>Daily Alarms & Missions</Text>
-          <Text style={styles.subtitle}>Configure daily alarms, missions and monitor sleep debt.</Text>
-        </View>
-
-        {/* Pre-Exam Sleep Enforcer Warning */}
-        {isExamTomorrow() && (
-          <View style={styles.examEnforcerCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
-              <Ionicons name="shield-checkmark" size={20} color="#E11D48" style={{ marginRight: 8 }} />
-              <Text style={styles.examEnforcerTitle}>PRE-EXAM SLEEP ENFORCER</Text>
-            </View>
-            <Text style={styles.examEnforcerText}>
-              Bhai, you have an exam tomorrow! Bedtime is automatically set 1 hour earlier. Sleep is your best revision tool tonight. Avoid screen time after 9 PM.
-            </Text>
-          </View>
-        )}
-
-        {/* Multiple Custom Alarms Section */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Wake Up Alarms</Text>
-          <TouchableOpacity 
-            style={styles.addAlarmHeaderBtn} 
-            onPress={() => {
-              setEditingAlarm(null);
-              setEditTimeHour('07');
-              setEditTimeMin('00');
-              setEditMission('none');
-              setEditDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
-              setEditRingtone({
-                type: 'default',
-                name: 'Default Beep (Mixkit)',
-                uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav'
-              });
-              setShowEditModal(true);
-            }}
-          >
-            <Ionicons name="add-circle-outline" size={18} color="#C2A878" style={{ marginRight: 4 }} />
-            <Text style={styles.addAlarmHeaderBtnText}>Add Alarm</Text>
+        <View style={styles.alarmsHeaderRow}>
+          <Text style={styles.alarmsHeaderTitle}>Alarms</Text>
+          <TouchableOpacity style={styles.bellIconContainer} activeOpacity={0.8}>
+            <Ionicons name="notifications-outline" size={20} color="#F3F1EC" />
           </TouchableOpacity>
         </View>
 
-        {alarmsList.length === 0 ? (
-          <View style={styles.emptyAlarmsCard}>
-            <Ionicons name="alarm-outline" size={40} color="#5A6070" style={{ marginBottom: 8 }} />
-            <Text style={styles.emptyAlarmsText}>No custom alarms set.</Text>
-            <Text style={styles.emptyAlarmsSub}>Add one to wake up with your chosen missions!</Text>
-          </View>
-        ) : (
-          <View style={{ gap: 16 }}>
-            {/* 1. Next / Hero Alarm */}
-            {nextAlarmData && nextAlarmData.alarm && (
-              <View style={styles.heroCard}>
-                <View style={styles.heroHeader}>
-                  <View style={styles.nextBadge}>
-                    <Text style={styles.nextBadgeText}>NEXT</Text>
+        {/* Tab Segment Controls */}
+        <View style={styles.segmentedContainer}>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeTab === 'alarm' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('alarm')}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="alarm-outline" size={16} color={activeTab === 'alarm' ? '#BA7517' : '#8B92A0'} />
+              <Text style={[styles.segmentBtnText, activeTab === 'alarm' && styles.segmentBtnTextActive]}>Alarm</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeTab === 'sleep' && styles.segmentBtnActive]}
+            onPress={() => setActiveTab('sleep')}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="moon-outline" size={16} color={activeTab === 'sleep' ? '#BA7517' : '#8B92A0'} />
+              <Text style={[styles.segmentBtnText, activeTab === 'sleep' && styles.segmentBtnTextActive]}>Sleep Cycle</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {activeTab === 'alarm' ? (
+          <View style={{ gap: 20, marginTop: 16 }}>
+            {/* Hero Wake Up Alarm Card */}
+            <View style={styles.heroCard}>
+              <View style={styles.heroTimeRow}>
+                <TouchableOpacity 
+                  style={{ flex: 1 }} 
+                  activeOpacity={0.7}
+                  onPress={handleEditHeroAlarm}
+                >
+                  <Text style={styles.heroLabel}>WAKE UP (TAP TO EDIT)</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                    <Text style={styles.heroTimeText}>{formatTimeWithAmPm(alarms.wakeTime).time}</Text>
+                    <Text style={styles.heroAmPm}>{formatTimeWithAmPm(alarms.wakeTime).ampm}</Text>
+                    <Ionicons name="create-outline" size={16} color="#BA7517" style={{ marginLeft: 8, alignSelf: 'center' }} />
                   </View>
-                  <Text style={styles.heroCountdown}>{formatCountdown(nextAlarmData.diffMs)}</Text>
-                </View>
-
-                <View style={styles.heroBodyRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.heroTime}>{formatAlarmTime(nextAlarmData.alarm.time)}</Text>
-                    <Text style={styles.heroDaysText}>
-                      {nextAlarmData.alarm.days && nextAlarmData.alarm.days.length > 0 
-                        ? (nextAlarmData.alarm.days.length === 7 ? 'Every day' : nextAlarmData.alarm.days.join(', '))
-                        : 'Daily'}
-                    </Text>
-                  </View>
-
-                  <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-                    <Switch 
-                      value={nextAlarmData.alarm.enabled}
-                      onValueChange={(val) => {
-                        if (nextAlarmData.alarm.isLegacy) {
-                          setAlarms({ ...alarms, wakeEnabled: val });
-                        } else {
-                          toggleAlarmStatus(nextAlarmData.alarm.id, val);
-                        }
-                      }}
-                      trackColor={{ false: '#0F1115', true: 'rgba(194, 168, 120, 0.4)' }}
-                      thumbColor={nextAlarmData.alarm.enabled ? '#C2A878' : '#8B92A0'}
-                    />
-                  </View>
-                </View>
-
-                {/* Mission Badge & Ringtone */}
-                <View style={styles.heroMetaRow}>
-                  <View style={styles.heroMissionPill}>
-                    <Ionicons 
-                      name={
-                        nextAlarmData.alarm.mission === 'math' ? 'calculator-outline' :
-                        nextAlarmData.alarm.mission === 'shake' ? 'phone-portrait-outline' :
-                        nextAlarmData.alarm.mission === 'typing' ? 'text-outline' :
-                        nextAlarmData.alarm.mission === 'walking' ? 'walk-outline' : 'hand-left-outline'
-                      } 
-                      size={12} 
-                      color="#C2A878" 
-                    />
-                    <Text style={styles.heroMissionText}>
-                      {nextAlarmData.alarm.mission === 'none' ? 'TAP STOP' : nextAlarmData.alarm.mission.toUpperCase()}
-                    </Text>
-                  </View>
-
-                  <View style={styles.heroRingtonePill}>
-                    <Ionicons name="musical-notes-outline" size={12} color="#8B92A0" />
-                    <Text style={styles.heroRingtoneText} numberOfLines={1}>
-                      {nextAlarmData.alarm.ringtone?.name || 'Default Beep'}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Action buttons (only show if not legacy) */}
-                {!nextAlarmData.alarm.isLegacy && (
-                  <View style={styles.heroActionsRow}>
-                    <TouchableOpacity 
-                      style={styles.heroActionBtn} 
-                      onPress={() => handleEditAlarmPress(nextAlarmData.alarm)}
-                    >
-                      <Ionicons name="create-outline" size={13} color="#8B92A0" style={{ marginRight: 4 }} />
-                      <Text style={styles.heroActionBtnText}>Edit</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={[styles.heroActionBtn, { borderColor: 'rgba(194, 168, 120, 0.15)' }]} 
-                      onPress={() => triggerAlarm('wake', nextAlarmData.alarm)}
-                    >
-                      <Ionicons name="play-outline" size={13} color="#C2A878" style={{ marginRight: 4 }} />
-                      <Text style={[styles.heroActionBtnText, { color: '#C2A878' }]}>Test</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity 
-                      style={styles.heroActionBtn} 
-                      onPress={() => handleDeleteAlarm(nextAlarmData.alarm.id)}
-                    >
-                      <Ionicons name="trash-outline" size={13} color="#C47070" style={{ marginRight: 4 }} />
-                      <Text style={[styles.heroActionBtnText, { color: '#C47070' }]}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                  <Text style={styles.heroCountdown}>{getLegacyWakeCountdown()}</Text>
+                </TouchableOpacity>
+                <Switch 
+                  value={alarms.wakeEnabled}
+                  onValueChange={(val) => setAlarms({ ...alarms, wakeEnabled: val })}
+                  trackColor={{ false: '#0F1115', true: 'rgba(186, 117, 23, 0.4)' }}
+                  thumbColor={alarms.wakeEnabled ? '#BA7517' : '#8B92A0'}
+                />
               </View>
-            )}
 
-            {/* 2. Other / Inactive / Collapsed Alarms */}
-            {alarmsList.filter(a => !nextAlarmData || a.id !== nextAlarmData.alarm.id).length > 0 && (
-              <View style={{ marginTop: 8 }}>
-                <Text style={[styles.sectionTitle, { marginBottom: 8 }]}>OTHER WAKE UP ALARMS</Text>
-                {alarmsList
-                  .filter(a => !nextAlarmData || a.id !== nextAlarmData.alarm.id)
-                  .map((alarm) => {
-                    const formattedTime = formatAlarmTime(alarm.time);
-                    return (
-                      <View key={alarm.id} style={[styles.compactCard, !alarm.enabled && styles.cardDisabled]}>
-                        <View style={styles.compactRow}>
-                          <View style={{ flex: 1.2 }}>
-                            <Text style={styles.compactTime}>{formattedTime}</Text>
-                          </View>
-                          
-                          <View style={{ flex: 2, paddingRight: 4 }}>
-                            <Text style={styles.compactDaysText} numberOfLines={1}>
-                              {alarm.days && alarm.days.length > 0 
+              <View style={styles.heroDaysRow}>
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
+                  const active = alarms.wakeEnabled;
+                  return (
+                    <View
+                      key={day}
+                      style={[styles.dayPill, active && styles.dayPillActive]}
+                    >
+                      <Text style={[styles.dayPillText, active && styles.dayPillTextActive]}>
+                        {day}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Other Alarms Section */}
+            <Text style={styles.sectionTitle}>Other Alarms</Text>
+            {alarmsList.length === 0 ? (
+              <View style={styles.emptyAlarmsCard}>
+                <Ionicons name="alarm-outline" size={32} color="#5A6070" style={{ marginBottom: 8 }} />
+                <Text style={styles.emptyAlarmsText}>No custom alarms set.</Text>
+              </View>
+            ) : (
+              <View style={{ gap: 10 }}>
+                {alarmsList.map((alarm) => {
+                  const formatted = formatTimeWithAmPm(alarm.time);
+                  return (
+                    <TouchableOpacity
+                      key={alarm.id}
+                      style={[styles.otherAlarmCard, !alarm.enabled && styles.cardDisabled]}
+                      onPress={() => handleEditAlarmPress(alarm)}
+                      onLongPress={() => {
+                        Alert.alert(
+                          "Delete Alarm",
+                          "Do you want to delete this alarm?",
+                          [
+                            { text: "Cancel", style: "cancel" },
+                            { text: "Delete", style: "destructive", onPress: () => handleDeleteAlarm(alarm.id) }
+                          ]
+                        );
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                          <Text style={styles.otherAlarmTime}>{formatted.time}</Text>
+                          <Text style={[styles.otherAlarmAmPm, { fontSize: 13, fontFamily: 'PlusJakartaSans_700Bold', color: '#F3F1EC', marginLeft: 2 }]}>{formatted.ampm}</Text>
+                        </View>
+                        <View style={styles.otherAlarmDescRow}>
+                          <Text style={styles.otherAlarmDesc}>{alarm.mission === 'none' ? 'Morning Run' : `Mission: ${alarm.mission.toUpperCase()}`}</Text>
+                          <View style={styles.otherAlarmBadge}>
+                            <Text style={styles.otherAlarmBadgeText}>
+                              {alarm.days && alarm.days.length > 0
                                 ? (alarm.days.length === 7 ? 'Daily' : alarm.days.join(', '))
                                 : 'Daily'}
                             </Text>
                           </View>
-
-                          <View style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center' }}>
-                            <Ionicons 
-                              name={
-                                alarm.mission === 'math' ? 'calculator-outline' :
-                                alarm.mission === 'shake' ? 'phone-portrait-outline' :
-                                alarm.mission === 'typing' ? 'text-outline' :
-                                alarm.mission === 'walking' ? 'walk-outline' : 'hand-left-outline'
-                              } 
-                              size={12} 
-                              color="#8B92A0" 
-                              style={{ marginRight: 4 }}
-                            />
-                            <Text style={styles.compactMissionText} numberOfLines={1}>
-                              {alarm.mission === 'none' ? 'None' : alarm.mission}
-                            </Text>
-                          </View>
-
-                          <Switch 
-                            value={alarm.enabled}
-                            onValueChange={(val) => toggleAlarmStatus(alarm.id, val)}
-                            trackColor={{ false: '#0F1115', true: 'rgba(194, 168, 120, 0.4)' }}
-                            thumbColor={alarm.enabled ? '#C2A878' : '#8B92A0'}
-                            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                          />
-
-                          <View style={styles.compactActions}>
-                            <TouchableOpacity onPress={() => handleEditAlarmPress(alarm)} style={styles.compactActionBtn}>
-                              <Ionicons name="create-outline" size={16} color="#8B92A0" />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => handleDeleteAlarm(alarm.id)} style={styles.compactActionBtn}>
-                              <Ionicons name="trash-outline" size={16} color="#C47070" />
-                            </TouchableOpacity>
-                          </View>
                         </View>
                       </View>
-                    );
-                  })}
+                      <Switch 
+                        value={alarm.enabled}
+                        onValueChange={(val) => toggleAlarmStatus(alarm.id, val)}
+                        trackColor={{ false: '#0F1115', true: 'rgba(186, 117, 23, 0.4)' }}
+                        thumbColor={alarm.enabled ? '#BA7517' : '#8B92A0'}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
-          </View>
-        )}
 
-        {/* Other Alarms & Toggles */}
-        <Text style={styles.sectionTitle}>Routine Habits Alarms</Text>
-        <View style={styles.card}>
-          {/* Water Alarms */}
-          <View style={styles.routineRow}>
-            <Ionicons name="water-outline" size={20} color="#4B6BFB" style={{ marginRight: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.routineTitle}>Water Reminders (3 Daily Alarms)</Text>
-              <Text style={styles.routineDesc}>Reminds at 09:00 AM, 02:00 PM, 07:00 PM</Text>
-            </View>
-            <Switch 
-              value={alarms.waterEnabled}
-              onValueChange={(val) => setAlarms({ ...alarms, waterEnabled: val })}
-              trackColor={{ false: '#0F1115', true: 'rgba(194, 168, 120, 0.4)' }}
-              thumbColor={alarms.waterEnabled ? '#C2A878' : '#8B92A0'}
-            />
-          </View>
-          <View style={styles.divider} />
-
-          {/* Meals Alarms */}
-          <View style={styles.routineRow}>
-            <Ionicons name="restaurant-outline" size={20} color="#7C9B7A" style={{ marginRight: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.routineTitle}>Meal Times (Breakfast/Lunch/Dinner)</Text>
-              <Text style={styles.routineDesc}>Fires alert with one-tap food logger link</Text>
-            </View>
-            <Switch 
-              value={alarms.mealsEnabled}
-              onValueChange={(val) => setAlarms({ ...alarms, mealsEnabled: val })}
-              trackColor={{ false: '#0F1115', true: 'rgba(194, 168, 120, 0.4)' }}
-              thumbColor={alarms.mealsEnabled ? '#C2A878' : '#8B92A0'}
-            />
-          </View>
-          <View style={styles.divider} />
-
-          {/* Medicine Reminder */}
-          <View style={styles.routineRow}>
-            <Ionicons name="medical-outline" size={20} color="#C47070" style={{ marginRight: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.routineTitle}>Meds Reminder: {alarms.medicationName}</Text>
-              <Text style={styles.routineDesc}>Dose: {alarms.medicationDose} at {alarms.medicationTime}</Text>
-            </View>
-            <Switch 
-              value={alarms.medicationEnabled}
-              onValueChange={(val) => setAlarms({ ...alarms, medicationEnabled: val })}
-              trackColor={{ false: '#0F1115', true: 'rgba(194, 168, 120, 0.4)' }}
-              thumbColor={alarms.medicationEnabled ? '#C2A878' : '#8B92A0'}
-            />
-          </View>
-          {alarms.medicationEnabled && (
-            <View style={styles.medInputsContainer}>
-              <TextInput 
-                style={styles.medInput}
-                value={alarms.medicationName}
-                onChangeText={(txt) => setAlarms({ ...alarms, medicationName: txt })}
-                placeholder="Medicine Name"
-                placeholderTextColor="#5A6070"
-              />
-              <TextInput 
-                style={styles.medInput}
-                value={alarms.medicationDose}
-                onChangeText={(txt) => setAlarms({ ...alarms, medicationDose: txt })}
-                placeholder="Dosage (e.g. 1 Tablet)"
-                placeholderTextColor="#5A6070"
-              />
-              <TextInput 
-                style={styles.medInput}
-                value={alarms.medicationTime}
-                onChangeText={(txt) => setAlarms({ ...alarms, medicationTime: txt })}
-                placeholder="Time (HH:MM)"
-                placeholderTextColor="#5A6070"
-              />
-            </View>
-          )}
-        </View>
-
-        {/* Sleep Logger Section */}
-        <Text style={styles.sectionTitle}>Sleep Cycle & Quality Tracker</Text>
-        
-        {/* Sleep Debt Alert Banner */}
-        {showSleepDebtAlert && (
-          <View style={styles.debtAlertCard}>
-            <Ionicons name="warning-outline" size={24} color="#C47070" style={{ marginRight: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.debtAlertTitle}>SLEEP DEBT DETECTED</Text>
-              <Text style={styles.debtAlertText}>
-                Your weekly sleep average is {averageSleepHours}h. Studies show academic performance drops by 20% below 6h. Catch up tonight, grinder!
-              </Text>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.card}>
-          <Text style={styles.subLabel}>LOG YESTERDAY'S SLEEP</Text>
-          <View style={styles.sleepInputRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.inputLabel}>Bedtime</Text>
-              <TextInput 
-                style={styles.timeInputBox}
-                value={bedtimeInput}
-                onChangeText={setBedtimeInput}
-                placeholder="22:30"
-                placeholderTextColor="#5A6070"
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.inputLabel}>Wake-up Time</Text>
-              <TextInput 
-                style={styles.timeInputBox}
-                value={waketimeInput}
-                onChangeText={setWaketimeInput}
-                placeholder="06:30"
-                placeholderTextColor="#5A6070"
-              />
-            </View>
-          </View>
-
-          <Text style={styles.inputLabel}>Sleep Quality Rating</Text>
-          <View style={styles.ratingRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity
-                key={star}
-                style={[styles.starBtn, sleepRatingInput === star && styles.starBtnActive]}
-                onPress={() => setSleepRatingInput(star)}
-              >
-                <Ionicons name={sleepRatingInput >= star ? "star" : "star-outline"} size={22} color={sleepRatingInput >= star ? '#C2A878' : '#8B92A0'} />
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <TouchableOpacity style={styles.saveSleepBtn} onPress={handleLogSleep}>
-            <Text style={styles.saveSleepBtnText}>Log Sleep Stats (+15 XP)</Text>
-          </TouchableOpacity>
-
-          {/* Sleep Stats graphs */}
-          {sleepLogs.length > 0 && (
-            <View style={{ marginTop: 24 }}>
-              <Text style={styles.subLabel}>LAST 5 DAYS SLEEP LOGS</Text>
-              <View style={styles.sleepLogList}>
-                {sleepLogs.slice(0, 5).map((log, idx) => (
-                  <View key={idx} style={styles.logRow}>
-                    <Text style={styles.logDate}>{log.date}</Text>
-                    <Text style={styles.logHours}>{log.hours}h ({log.cycles} cycles)</Text>
-                    <View style={styles.logStars}>
-                      {Array.from({ length: log.rating }).map((_, i) => (
-                        <Ionicons key={i} name="star" size={10} color="#C2A878" />
-                      ))}
-                    </View>
+            {/* Routine Reminders Section */}
+            <Text style={styles.sectionTitle}>Routine Reminders</Text>
+            <View style={{ gap: 10 }}>
+              {/* Drink Water */}
+              <View style={styles.routineCard}>
+                <TouchableOpacity 
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
+                  activeOpacity={0.7}
+                  onPress={() => handleEditRoutinePress('water')}
+                >
+                  <View style={styles.routineIconContainer}>
+                    <Ionicons name="water-outline" size={18} color="#BA7517" />
                   </View>
-                ))}
+                  <View style={styles.routineTextContainer}>
+                    <Text style={styles.routineTitleText}>Drink Water (Tap to Edit)</Text>
+                    <Text style={styles.routineDescText}>Times: {(alarms.waterTimes || []).join(', ')}</Text>
+                  </View>
+                </TouchableOpacity>
+                <Switch 
+                  value={alarms.waterEnabled}
+                  onValueChange={(val) => setAlarms({ ...alarms, waterEnabled: val })}
+                  trackColor={{ false: '#0F1115', true: 'rgba(186, 117, 23, 0.4)' }}
+                  thumbColor={alarms.waterEnabled ? '#BA7517' : '#8B92A0'}
+                />
+              </View>
+
+              {/* Lunch Break */}
+              <View style={styles.routineCard}>
+                <TouchableOpacity 
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
+                  activeOpacity={0.7}
+                  onPress={() => handleEditRoutinePress('meal')}
+                >
+                  <View style={styles.routineIconContainer}>
+                    <Ionicons name="restaurant-outline" size={18} color="#BA7517" />
+                  </View>
+                  <View style={styles.routineTextContainer}>
+                    <Text style={styles.routineTitleText}>Meal Reminders (Tap to Edit)</Text>
+                    <Text style={styles.routineDescText}>Lunch: {alarms.mealLunch || '13:00'} | Breakfast: {alarms.mealBreakfast || '08:30'} | Dinner: {alarms.mealDinner || '20:30'}</Text>
+                  </View>
+                </TouchableOpacity>
+                <Switch 
+                  value={alarms.mealsEnabled}
+                  onValueChange={(val) => setAlarms({ ...alarms, mealsEnabled: val })}
+                  trackColor={{ false: '#0F1115', true: 'rgba(186, 117, 23, 0.4)' }}
+                  thumbColor={alarms.mealsEnabled ? '#BA7517' : '#8B92A0'}
+                />
+              </View>
+
+              {/* Vitamins */}
+              <View style={styles.routineCard}>
+                <TouchableOpacity 
+                  style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }} 
+                  activeOpacity={0.7}
+                  onPress={() => handleEditRoutinePress('medication')}
+                >
+                  <View style={styles.routineIconContainer}>
+                    <Ionicons name="medical-outline" size={18} color="#BA7517" />
+                  </View>
+                  <View style={styles.routineTextContainer}>
+                    <Text style={styles.routineTitleText}>Vitamins Reminder (Tap to Edit)</Text>
+                    <Text style={styles.routineDescText}>{alarms.medicationName || 'Vitamin B12'} - {alarms.medicationDose || '1 tablet'} at {alarms.medicationTime || '21:30'}</Text>
+                  </View>
+                </TouchableOpacity>
+                <Switch 
+                  value={alarms.medicationEnabled}
+                  onValueChange={(val) => setAlarms({ ...alarms, medicationEnabled: val })}
+                  trackColor={{ false: '#0F1115', true: 'rgba(186, 117, 23, 0.4)' }}
+                  thumbColor={alarms.medicationEnabled ? '#BA7517' : '#8B92A0'}
+                />
               </View>
             </View>
-          )}
-        </View>
 
+            {/* Add Alarm Button */}
+            <TouchableOpacity 
+              style={styles.addAlarmBtn} 
+              activeOpacity={0.8}
+              onPress={() => {
+                setEditingAlarm(null);
+                setEditTimeHour('07');
+                setEditTimeMin('00');
+                setEditMission('none');
+                setEditDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+                setEditRingtone({
+                  type: 'default',
+                  name: 'Default Beep (Mixkit)',
+                  uri: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav'
+                });
+                setShowEditModal(true);
+              }}
+            >
+              <Text style={styles.addAlarmBtnText}>+ Add Alarm</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{ gap: 20, marginTop: 16 }}>
+            {/* Pre-Exam Sleep Enforcer Warning */}
+            {isExamTomorrow() && (
+              <View style={styles.examEnforcerCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                  <Ionicons name="shield-checkmark" size={20} color="#BA7517" style={{ marginRight: 8 }} />
+                  <Text style={styles.examEnforcerTitle}>PRE-EXAM SLEEP ENFORCER</Text>
+                </View>
+                <Text style={styles.examEnforcerText}>
+                  Bhai, you have an exam tomorrow! Bedtime is automatically set 1 hour earlier. Sleep is your best revision tool tonight. Avoid screen time after 9 PM.
+                </Text>
+              </View>
+            )}
+
+            {/* Sleep Debt Alert Banner */}
+            {showSleepDebtAlert && (
+              <View style={styles.debtAlertCard}>
+                <Ionicons name="warning-outline" size={24} color="#C47070" style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.debtAlertTitle}>SLEEP DEBT DETECTED</Text>
+                  <Text style={styles.debtAlertText}>
+                    Your weekly sleep average is {averageSleepHours}h. Studies show academic performance drops by 20% below 6h. Catch up tonight, grinder!
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Sleep Logger Section */}
+            <View style={styles.card}>
+              <Text style={styles.subLabel}>LOG YESTERDAY'S SLEEP</Text>
+              <View style={styles.sleepInputRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Bedtime</Text>
+                  <TextInput 
+                    style={styles.timeInputBox}
+                    value={bedtimeInput}
+                    onChangeText={setBedtimeInput}
+                    placeholder="22:30"
+                    placeholderTextColor="#5A6070"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Wake-up Time</Text>
+                  <TextInput 
+                    style={styles.timeInputBox}
+                    value={waketimeInput}
+                    onChangeText={setWaketimeInput}
+                    placeholder="06:30"
+                    placeholderTextColor="#5A6070"
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.inputLabel}>Sleep Quality Rating</Text>
+              <View style={styles.ratingRow}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    style={[styles.starBtn, sleepRatingInput === star && styles.starBtnActive]}
+                    onPress={() => setSleepRatingInput(star)}
+                  >
+                    <Ionicons name={sleepRatingInput >= star ? "star" : "star-outline"} size={22} color={sleepRatingInput >= star ? '#BA7517' : '#8B92A0'} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TouchableOpacity style={styles.saveSleepBtn} onPress={handleLogSleep}>
+                <Text style={styles.saveSleepBtnText}>Log Sleep Stats (+15 XP)</Text>
+              </TouchableOpacity>
+
+              {/* Sleep Stats graphs */}
+              {sleepLogs.length > 0 && (
+                <View style={{ marginTop: 24 }}>
+                  <Text style={styles.subLabel}>LAST 5 DAYS SLEEP LOGS</Text>
+                  <View style={styles.sleepLogList}>
+                    {sleepLogs.slice(0, 5).map((log, idx) => (
+                      <View key={idx} style={styles.logRow}>
+                        <Text style={styles.logDate}>{log.date}</Text>
+                        <Text style={styles.logHours}>{log.hours}h ({log.cycles} cycles)</Text>
+                        <View style={styles.logStars}>
+                          {Array.from({ length: log.rating }).map((_, i) => (
+                            <Ionicons key={i} name="star" size={10} color="#BA7517" />
+                          ))}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       {/* Add/Edit Alarm Modal */}
@@ -1188,33 +1650,71 @@ export default function AlarmScreen() {
 
             <ScrollView contentContainerStyle={styles.modalScroll}>
               
-              {/* Time Stepper Picker */}
-              <Text style={styles.modalLabel}>SELECT TIME</Text>
-              <View style={styles.stepperContainer}>
-                {/* Hour Stepper */}
-                <View style={styles.stepperCol}>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => adjustHour(1)}>
-                    <Ionicons name="chevron-up" size={20} color="#C2A878" />
-                  </TouchableOpacity>
-                  <Text style={styles.stepVal}>{editTimeHour}</Text>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => adjustHour(-1)}>
-                    <Ionicons name="chevron-down" size={20} color="#C2A878" />
-                  </TouchableOpacity>
-                  <Text style={styles.stepperLabel}>Hours</Text>
+              {/* Time Scroll Picker */}
+              <Text style={styles.modalLabel}>SCROLL TO SET TIME</Text>
+              <View style={styles.scrollPickerContainer}>
+                <View style={styles.scrollPickerIndicator} pointerEvents="none" />
+                
+                {/* Hours column */}
+                <View style={styles.scrollPickerCol}>
+                  <ScrollView
+                    ref={hourScrollRef}
+                    showsVerticalScrollIndicator={false}
+                    snapToInterval={60}
+                    decelerationRate="fast"
+                    onMomentumScrollEnd={handleHourScrollEnd}
+                    contentContainerStyle={{ paddingVertical: 60 }}
+                    nestedScrollEnabled={true}
+                  >
+                    {HOURS.map((h, index) => {
+                      const isSelected = h === editTimeHour;
+                      return (
+                        <TouchableOpacity 
+                          key={h} 
+                          style={styles.scrollPickerItem}
+                          onPress={() => selectHourIndex(index)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.scrollPickerItemText, isSelected && styles.scrollPickerItemTextActive]}>
+                            {h}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  <Text style={styles.scrollPickerLabel}>Hours</Text>
                 </View>
 
-                <Text style={styles.stepperSeparator}>:</Text>
+                <Text style={styles.scrollPickerSeparator}>:</Text>
 
-                {/* Minute Stepper */}
-                <View style={styles.stepperCol}>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => adjustMin(1)}>
-                    <Ionicons name="chevron-up" size={20} color="#C2A878" />
-                  </TouchableOpacity>
-                  <Text style={styles.stepVal}>{editTimeMin}</Text>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => adjustMin(-1)}>
-                    <Ionicons name="chevron-down" size={20} color="#C2A878" />
-                  </TouchableOpacity>
-                  <Text style={styles.stepperLabel}>Minutes</Text>
+                {/* Minutes column */}
+                <View style={styles.scrollPickerCol}>
+                  <ScrollView
+                    ref={minScrollRef}
+                    showsVerticalScrollIndicator={false}
+                    snapToInterval={60}
+                    decelerationRate="fast"
+                    onMomentumScrollEnd={handleMinScrollEnd}
+                    contentContainerStyle={{ paddingVertical: 60 }}
+                    nestedScrollEnabled={true}
+                  >
+                    {MINUTES.map((m, index) => {
+                      const isSelected = m === editTimeMin;
+                      return (
+                        <TouchableOpacity 
+                          key={m} 
+                          style={styles.scrollPickerItem}
+                          onPress={() => selectMinIndex(index)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.scrollPickerItemText, isSelected && styles.scrollPickerItemTextActive]}>
+                            {m}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  <Text style={styles.scrollPickerLabel}>Minutes</Text>
                 </View>
               </View>
 
@@ -1278,8 +1778,35 @@ export default function AlarmScreen() {
               </TouchableOpacity>
 
               <Text style={styles.selectedToneText}>
-                Selected: <Text style={{ color: '#C2A878', fontFamily: 'PlusJakartaSans_700Bold' }}>{editRingtone?.name}</Text>
+                Selected: <Text style={{ color: '#BA7517', fontFamily: 'PlusJakartaSans_700Bold' }}>{editRingtone?.name}</Text>
               </Text>
+
+              {(alarms.customRingtones && alarms.customRingtones.length > 0) && (
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={styles.subModalLabel}>CUSTOM PICKED SOUNDS</Text>
+                  <View style={styles.builtInSoundsList}>
+                    {alarms.customRingtones.map((tone) => {
+                      const isSelected = editRingtone?.type === tone.type && editRingtone?.uri === tone.uri;
+                      return (
+                        <TouchableOpacity
+                          key={tone.id || tone.uri}
+                          style={[styles.soundItem, isSelected && styles.soundItemActive]}
+                          onPress={() => selectRingtoneWithPreview(tone)}
+                        >
+                          <Ionicons 
+                            name={isSelected ? "radio-button-on" : "radio-button-off"} 
+                            size={16} 
+                            color={isSelected ? '#BA7517' : '#8B92A0'} 
+                          />
+                          <Text style={[styles.soundItemText, isSelected && styles.soundItemTextActive]}>
+                            {tone.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
 
               <Text style={styles.subModalLabel}>OR CHOOSE BUILT-IN SOUNDS</Text>
               <View style={styles.builtInSoundsList}>
@@ -1290,12 +1817,12 @@ export default function AlarmScreen() {
                     <TouchableOpacity
                       key={tone.id}
                       style={[styles.soundItem, isSelected && styles.soundItemActive]}
-                      onPress={() => setEditRingtone(tone)}
+                      onPress={() => selectRingtoneWithPreview(tone)}
                     >
                       <Ionicons 
                         name={isSelected ? "radio-button-on" : "radio-button-off"} 
                         size={16} 
-                        color={isSelected ? '#C2A878' : '#8B92A0'} 
+                        color={isSelected ? '#BA7517' : '#8B92A0'} 
                       />
                       <Text style={[styles.soundItemText, isSelected && styles.soundItemTextActive]}>
                         {tone.name}
@@ -1311,7 +1838,7 @@ export default function AlarmScreen() {
             <View style={styles.modalActions}>
               <TouchableOpacity 
                 style={[styles.modalBtn, styles.modalCancelBtn]} 
-                onPress={() => setShowEditModal(false)}
+                onPress={() => { stopRingtonePreview(); setShowEditModal(false); }}
               >
                 <Text style={styles.modalCancelBtnText}>Cancel</Text>
               </TouchableOpacity>
@@ -1321,6 +1848,135 @@ export default function AlarmScreen() {
                 onPress={handleSaveAlarm}
               >
                 <Text style={styles.modalSaveBtnText}>Save Alarm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Routine Modal */}
+      <Modal
+        visible={showRoutineModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowRoutineModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {selectedRoutine === 'water' ? 'Edit Hydration Routine' :
+                 selectedRoutine === 'meal' ? 'Edit Meal Schedules' :
+                 'Edit Medication Schedule'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowRoutineModal(false)}>
+                <Ionicons name="close" size={24} color="#8B92A0" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalScroll}>
+              {selectedRoutine === 'water' && (
+                <View>
+                  <Text style={styles.modalLabel}>HYDRATION TIMES (24H, COMMA SEPARATED)</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    value={routineWaterTimesStr}
+                    onChangeText={setRoutineWaterTimesStr}
+                    placeholder="e.g. 09:00, 14:00, 19:00"
+                    placeholderTextColor="#5A6070"
+                    autoFocus
+                  />
+                  <Text style={styles.selectedToneText}>
+                    Please use 24h format separated by commas (e.g. 09:00, 12:00, 15:30).
+                  </Text>
+                </View>
+              )}
+
+              {selectedRoutine === 'meal' && (
+                <View style={{ gap: 12 }}>
+                  <View>
+                    <Text style={styles.modalLabel}>BREAKFAST TIME (24H)</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      value={routineBreakfastTime}
+                      onChangeText={setRoutineBreakfastTime}
+                      placeholder="e.g. 08:30"
+                      placeholderTextColor="#5A6070"
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.modalLabel}>LUNCH TIME (24H)</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      value={routineLunchTime}
+                      onChangeText={setRoutineLunchTime}
+                      placeholder="e.g. 13:00"
+                      placeholderTextColor="#5A6070"
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.modalLabel}>DINNER TIME (24H)</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      value={routineDinnerTime}
+                      onChangeText={setRoutineDinnerTime}
+                      placeholder="e.g. 20:30"
+                      placeholderTextColor="#5A6070"
+                    />
+                  </View>
+                </View>
+              )}
+
+              {selectedRoutine === 'medication' && (
+                <View style={{ gap: 12 }}>
+                  <View>
+                    <Text style={styles.modalLabel}>MEDICATION / VITAMIN NAME</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      value={routineMedsName}
+                      onChangeText={setRoutineMedsName}
+                      placeholder="e.g. Vitamin B12"
+                      placeholderTextColor="#5A6070"
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.modalLabel}>DOSAGE</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      value={routineMedsDose}
+                      onChangeText={setRoutineMedsDose}
+                      placeholder="e.g. 1 tablet"
+                      placeholderTextColor="#5A6070"
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.modalLabel}>REMINDER TIME (24H)</Text>
+                    <TextInput
+                      style={styles.modalInput}
+                      value={routineMedsTime}
+                      onChangeText={setRoutineMedsTime}
+                      placeholder="e.g. 21:30"
+                      placeholderTextColor="#5A6070"
+                    />
+                  </View>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Modal Bottom Actions */}
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.modalCancelBtn]} 
+                onPress={() => setShowRoutineModal(false)}
+              >
+                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalBtn, styles.modalSaveBtn]} 
+                onPress={handleSaveRoutine}
+              >
+                <Text style={styles.modalSaveBtnText}>Save Routine</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1338,8 +1994,18 @@ export default function AlarmScreen() {
           <Animated.View style={[styles.ringingGlowCircle, { transform: [{ scale: ringScale }] }]} />
           
           <Ionicons name="alarm" size={80} color="#E11D48" style={styles.ringingIcon} />
-          <Text style={styles.ringingTitle}>WAKE UP GRINDER!</Text>
-          <Text style={styles.ringingSub}>Volume: {Math.round(currentVolume * 100)}% (No heart-attack ramping)</Text>
+          <Text style={styles.ringingTitle}>
+            {ringAlarmType === 'wake' ? 'WAKE UP GRINDER!' : 
+             ringAlarmType === 'water' ? 'TIME TO DRINK WATER!' :
+             ringAlarmType === 'meal' ? 'MEAL TIME BREAK!' :
+             ringAlarmType === 'meds' ? 'TAKE YOUR MEDICINE!' :
+             'WIND DOWN TIME!'}
+          </Text>
+          <Text style={styles.ringingSub}>
+            {ringAlarmType === 'wake' 
+              ? `Volume: ${Math.round(currentVolume * 100)}% (No heart-attack ramping)`
+              : 'Stay consistent with your healthy study habits!'}
+          </Text>
           
           <View style={styles.ringingProgressTrack}>
             <View style={[styles.ringingProgressBar, { width: `${(alarmProgressTime/60)*100}%` }]} />
@@ -1347,83 +2013,102 @@ export default function AlarmScreen() {
           
           {/* Ringing Missions Container */}
           <View style={styles.missionActiveCard}>
-            <Text style={styles.missionHeading}>ACTIVE WAKE-UP MISSION</Text>
-            
-            {/* 1. MATH MISSION */}
-            {ringingMission === 'math' && mathProblems.length > 0 && (
+            {ringAlarmType !== 'wake' ? (
               <View style={{ alignItems: 'center', width: '100%' }}>
-                <Text style={styles.missionObjective}>Solve this mental puzzle ({currentMathIdx + 1}/{mathProblems.length}):</Text>
-                <Text style={styles.mathQuestion}>{mathProblems[currentMathIdx]?.question}</Text>
-                <TextInput
-                  style={styles.mathInput}
-                  keyboardType="numeric"
-                  value={mathAnswerInput}
-                  onChangeText={setMathAnswerInput}
-                  placeholder="Answer?"
-                  placeholderTextColor="#5A6070"
-                  onSubmitEditing={handleMathAnswerSubmit}
-                  autoFocus
-                />
-                <TouchableOpacity style={styles.missionSubmitBtn} onPress={handleMathAnswerSubmit}>
-                  <Text style={styles.missionSubmitText}>Verify Equation</Text>
-                </TouchableOpacity>
-              </View>
-            )}
- 
-            {/* 2. SHAKE MISSION */}
-            {ringingMission === 'shake' && (
-              <View style={{ alignItems: 'center', width: '100%' }}>
-                <Text style={styles.missionObjective}>Shake phone vigorously to shut off alarm:</Text>
-                <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
-                  <Ionicons name="phone-portrait" size={60} color="#C2A878" style={{ marginVertical: 16 }} />
-                </Animated.View>
-                <Text style={styles.shakeCounter}>{shakeCount} / {targetShakes} Shakes</Text>
-                <TouchableOpacity style={styles.manualShakeBtn} onPress={handleShakeSensorTrigger}>
-                  <Text style={styles.manualShakeBtnText}>TAP TO SHAKE PHONE 📳</Text>
-                </TouchableOpacity>
-              </View>
-            )}
- 
-            {/* 3. TYPING MISSION */}
-            {ringingMission === 'typing' && (
-              <View style={{ alignItems: 'center', width: '100%' }}>
-                <Text style={styles.missionObjective}>Type this sentence exactly to silence alarm:</Text>
-                <Text style={styles.typingQuoteText}>"{typingQuote}"</Text>
-                <TextInput
-                  style={styles.typingInput}
-                  value={typingInput}
-                  onChangeText={handleTypingTextChange}
-                  placeholder="Type here..."
-                  placeholderTextColor="#5A6070"
-                  multiline
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <Text style={styles.typingMatchPercent}>
-                  {typingInput === typingQuote ? "MATCHED! 🎉" : "Typing..."}
+                <Text style={styles.missionHeading}>ROUTINE CHECKPOINT</Text>
+                <Text style={styles.missionObjective}>
+                  {ringAlarmType === 'water' ? 'Drink a glass of water to keep your body and brain hydrated!' :
+                   ringAlarmType === 'meal' ? 'Take a healthy meal break and recharge your brain!' :
+                   ringAlarmType === 'meds' ? `Take your medication: ${alarms.medicationName || 'Vitamins'} (${alarms.medicationDose || '1 tablet'}).` :
+                   'Review your study logs and start winding down for good sleep!'}
                 </Text>
-              </View>
-            )}
- 
-            {/* 4. WALKING MISSION */}
-            {ringingMission === 'walking' && (
-              <View style={{ alignItems: 'center', width: '100%' }}>
-                <Text style={styles.missionObjective}>Take steps to activate your body chemistry:</Text>
-                <Ionicons name="walk" size={60} color="#7C9B7A" style={{ marginVertical: 16 }} />
-                <Text style={styles.shakeCounter}>{walkSteps} / {targetSteps} steps</Text>
-                <TouchableOpacity style={styles.manualShakeBtn} onPress={handleStepWalkTrigger}>
-                  <Text style={styles.manualShakeBtnText}>SIMULATE STEP 🚶</Text>
-                </TouchableOpacity>
-              </View>
-            )}
- 
-            {/* 5. NONE MISSION */}
-            {ringingMission === 'none' && (
-              <View style={{ alignItems: 'center', width: '100%' }}>
-                <Text style={styles.missionObjective}>Ready to grind? Tap below to stop.</Text>
                 <TouchableOpacity style={styles.missionSubmitBtn} onPress={completeAlarmSuccess}>
-                  <Text style={styles.missionSubmitText}>Stop Alarm</Text>
+                  <Text style={styles.missionSubmitText}>I completed this!</Text>
                 </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ alignItems: 'center', width: '100%' }}>
+                <Text style={styles.missionHeading}>ACTIVE WAKE-UP MISSION</Text>
+                
+                {/* 1. MATH MISSION */}
+                {ringingMission === 'math' && mathProblems.length > 0 && (
+                  <View style={{ alignItems: 'center', width: '100%' }}>
+                    <Text style={styles.missionObjective}>Solve this mental puzzle ({currentMathIdx + 1}/{mathProblems.length}):</Text>
+                    <Text style={styles.mathQuestion}>{mathProblems[currentMathIdx]?.question}</Text>
+                    <TextInput
+                      style={styles.mathInput}
+                      keyboardType="numeric"
+                      value={mathAnswerInput}
+                      onChangeText={setMathAnswerInput}
+                      placeholder="Answer?"
+                      placeholderTextColor="#5A6070"
+                      onSubmitEditing={handleMathAnswerSubmit}
+                      autoFocus
+                    />
+                    <TouchableOpacity style={styles.missionSubmitBtn} onPress={handleMathAnswerSubmit}>
+                      <Text style={styles.missionSubmitText}>Verify Equation</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+     
+                {/* 2. SHAKE MISSION */}
+                {ringingMission === 'shake' && (
+                  <View style={{ alignItems: 'center', width: '100%' }}>
+                    <Text style={styles.missionObjective}>Shake phone vigorously to shut off alarm:</Text>
+                    <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
+                      <Ionicons name="phone-portrait" size={60} color="#BA7517" style={{ marginVertical: 16 }} />
+                    </Animated.View>
+                    <Text style={styles.shakeCounter}>{shakeCount} / {targetShakes} Shakes</Text>
+                    <Text style={styles.sensorHelpText}>Accelerometer active. Shake phone, or tap button below as fallback:</Text>
+                    <TouchableOpacity style={styles.manualShakeBtn} onPress={handleShakeSensorTrigger}>
+                      <Text style={styles.manualShakeBtnText}>TAP FALLBACK: SHAKE PHONE 📳</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+     
+                {/* 3. TYPING MISSION */}
+                {ringingMission === 'typing' && (
+                  <View style={{ alignItems: 'center', width: '100%' }}>
+                    <Text style={styles.missionObjective}>Type this sentence exactly to silence alarm:</Text>
+                    <Text style={styles.typingQuoteText}>"{typingQuote}"</Text>
+                    <TextInput
+                      style={styles.typingInput}
+                      value={typingInput}
+                      onChangeText={handleTypingTextChange}
+                      placeholder="Type here..."
+                      placeholderTextColor="#5A6070"
+                      multiline
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <Text style={styles.typingMatchPercent}>
+                      {typingInput === typingQuote ? "MATCHED! 🎉" : "Typing..."}
+                    </Text>
+                  </View>
+                )}
+     
+                {/* 4. WALKING MISSION */}
+                {ringingMission === 'walking' && (
+                  <View style={{ alignItems: 'center', width: '100%' }}>
+                    <Text style={styles.missionObjective}>Take steps to activate your body chemistry:</Text>
+                    <Ionicons name="walk" size={60} color="#7C9B7A" style={{ marginVertical: 16 }} />
+                    <Text style={styles.shakeCounter}>{walkSteps} / {targetSteps} steps</Text>
+                    <Text style={styles.sensorHelpText}>Pedometer tracking active. Take steps, or tap below as fallback:</Text>
+                    <TouchableOpacity style={styles.manualShakeBtn} onPress={handleStepWalkTrigger}>
+                      <Text style={styles.manualShakeBtnText}>TAP FALLBACK: SIMULATE STEP 🚶</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+     
+                {/* 5. NONE MISSION */}
+                {ringingMission === 'none' && (
+                  <View style={{ alignItems: 'center', width: '100%' }}>
+                    <Text style={styles.missionObjective}>Ready to grind? Tap below to stop.</Text>
+                    <TouchableOpacity style={styles.missionSubmitBtn} onPress={completeAlarmSuccess}>
+                      <Text style={styles.missionSubmitText}>Stop Alarm</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -1448,7 +2133,7 @@ const styles = StyleSheet.create({
   
   card: { backgroundColor: '#171B22', borderRadius: 24, padding: 20, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.03)' },
   alarmRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  alarmLabel: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, color: '#C2A878', letterSpacing: 0.5 },
+  alarmLabel: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, color: '#BA7517', letterSpacing: 0.5 },
   alarmTimeText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 32, color: '#F3F1EC', marginTop: 4 },
   
   timeInput: {
@@ -1479,8 +2164,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   missionBtnActive: {
-    backgroundColor: '#C2A878',
-    borderColor: '#C2A878'
+    backgroundColor: '#BA7517',
+    borderColor: '#BA7517'
   },
   missionBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: '#8B92A0' },
   missionBtnTextActive: { color: '#0F1115' },
@@ -1489,7 +2174,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 12,
     paddingVertical: 12,
     marginTop: 8
@@ -1515,14 +2200,14 @@ const styles = StyleSheet.create({
   },
 
   examEnforcerCard: {
-    backgroundColor: 'rgba(225, 29, 72, 0.05)',
+    backgroundColor: 'rgba(186, 117, 23, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(225, 29, 72, 0.25)',
+    borderColor: 'rgba(186, 117, 23, 0.3)',
     borderRadius: 20,
     padding: 16,
     marginBottom: 20
   },
-  examEnforcerTitle: { fontFamily: 'PlusJakartaSans_700Bold', color: '#E11D48', fontSize: 11, letterSpacing: 0.5 },
+  examEnforcerTitle: { fontFamily: 'PlusJakartaSans_700Bold', color: '#BA7517', fontSize: 11, letterSpacing: 0.5 },
   examEnforcerText: { fontFamily: 'PlusJakartaSans_500Medium', color: '#8B92A0', fontSize: 12, lineHeight: 18, marginTop: 4 },
 
   debtAlertCard: {
@@ -1555,7 +2240,7 @@ const styles = StyleSheet.create({
   starBtn: { padding: 4 },
   starBtnActive: {},
   saveSleepBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center'
@@ -1620,7 +2305,7 @@ const styles = StyleSheet.create({
   missionHeading: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 10,
-    color: '#C2A878',
+    color: '#BA7517',
     letterSpacing: 1.5,
     marginBottom: 16
   },
@@ -1641,7 +2326,7 @@ const styles = StyleSheet.create({
     width: '70%',
     backgroundColor: '#0F1115',
     borderWidth: 1.5,
-    borderColor: 'rgba(194, 168, 120, 0.3)',
+    borderColor: 'rgba(186, 117, 23, 0.3)',
     borderRadius: 14,
     padding: 12,
     color: '#F3F1EC',
@@ -1652,7 +2337,7 @@ const styles = StyleSheet.create({
   },
   missionSubmitBtn: {
     width: '70%',
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     padding: 12,
     borderRadius: 12,
     alignItems: 'center'
@@ -1668,12 +2353,12 @@ const styles = StyleSheet.create({
   manualShakeBtn: {
     backgroundColor: '#1D2430',
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.2)',
+    borderColor: 'rgba(186, 117, 23, 0.2)',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 14
   },
-  manualShakeBtnText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#C2A878', fontSize: 12 },
+  manualShakeBtnText: { fontFamily: 'PlusJakartaSans_700Bold', color: '#BA7517', fontSize: 12 },
   
   typingQuoteText: {
     fontFamily: 'PlusJakartaSans_500Medium',
@@ -1731,9 +2416,9 @@ const styles = StyleSheet.create({
   addAlarmHeaderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(194, 168, 120, 0.1)',
+    backgroundColor: 'rgba(186, 117, 23, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.25)',
+    borderColor: 'rgba(186, 117, 23, 0.25)',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -1741,7 +2426,7 @@ const styles = StyleSheet.create({
   addAlarmHeaderBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 12,
-    color: '#C2A878',
+    color: '#BA7517',
   },
   emptyAlarmsCard: {
     backgroundColor: '#171B22',
@@ -1794,7 +2479,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   dayBadgeActive: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     color: '#0F1115',
   },
   dayBadgeInactive: {
@@ -1828,7 +2513,7 @@ const styles = StyleSheet.create({
   heroCard: {
     backgroundColor: '#171B22',
     borderLeftWidth: 4,
-    borderLeftColor: '#C2A878',
+    borderLeftColor: '#BA7517',
     borderRadius: 16,
     padding: 20,
     marginBottom: 8,
@@ -1842,7 +2527,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   nextBadge: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -1884,7 +2569,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(194, 168, 120, 0.12)',
+    backgroundColor: 'rgba(186, 117, 23, 0.12)',
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1892,7 +2577,7 @@ const styles = StyleSheet.create({
   heroMissionText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 10,
-    color: '#C2A878',
+    color: '#BA7517',
   },
   heroRingtonePill: {
     flexDirection: 'row',
@@ -1992,8 +2677,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.03)',
   },
   testAlarmBtn: {
-    borderColor: 'rgba(194, 168, 120, 0.15)',
-    backgroundColor: 'rgba(194, 168, 120, 0.05)',
+    borderColor: 'rgba(186, 117, 23, 0.15)',
+    backgroundColor: 'rgba(186, 117, 23, 0.05)',
   },
   alarmActionBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
@@ -2079,7 +2764,7 @@ const styles = StyleSheet.create({
   stepperSeparator: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 32,
-    color: '#C2A878',
+    color: '#BA7517',
     marginHorizontal: 12,
     paddingBottom: 20,
   },
@@ -2099,8 +2784,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.03)',
   },
   dayPickerBadgeActive: {
-    backgroundColor: '#C2A878',
-    borderColor: '#C2A878',
+    backgroundColor: '#BA7517',
+    borderColor: '#BA7517',
   },
   dayPickerText: {
     fontFamily: 'PlusJakartaSans_700Bold',
@@ -2128,8 +2813,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   modalMissionBtnActive: {
-    backgroundColor: '#C2A878',
-    borderColor: '#C2A878',
+    backgroundColor: '#BA7517',
+    borderColor: '#BA7517',
   },
   modalMissionBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
@@ -2143,7 +2828,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 14,
     paddingVertical: 12,
     marginBottom: 8,
@@ -2211,11 +2896,278 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   modalSaveBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
   },
   modalSaveBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     color: '#0F1115',
     fontSize: 13,
-  }
+  },
+  alarmsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  alarmsHeaderTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 24,
+    color: '#F3F1EC'
+  },
+  bellIconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#171B22',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)'
+  },
+  segmentedContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#171B22',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 10
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  segmentBtnActive: {
+    backgroundColor: '#1D2430',
+  },
+  segmentBtnText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 12,
+    color: '#8B92A0',
+  },
+  segmentBtnTextActive: {
+    color: '#BA7517',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  heroCard: {
+    backgroundColor: '#171B22',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  heroLabel: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10,
+    color: '#5A6070',
+    letterSpacing: 1,
+    marginBottom: 6,
+  },
+  heroTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  heroTimeText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 40,
+    color: '#F3F1EC',
+  },
+  heroAmPm: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 20,
+    color: '#F3F1EC',
+    marginLeft: 4,
+  },
+  heroCountdown: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12,
+    color: '#BA7517',
+    marginTop: 2,
+    marginBottom: 12,
+  },
+  heroDaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    width: '100%',
+  },
+  dayPill: {
+    flex: 1,
+    marginHorizontal: 2,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayPillActive: {
+    backgroundColor: 'rgba(186, 117, 23, 0.15)',
+    borderColor: '#BA7517',
+  },
+  dayPillText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 9,
+    color: '#8B92A0',
+  },
+  dayPillTextActive: {
+    color: '#BA7517',
+    fontFamily: 'PlusJakartaSans_700Bold',
+  },
+  otherAlarmCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#171B22',
+    borderRadius: 16,
+    padding: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#BA7517',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  otherAlarmTime: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 20,
+    color: '#F3F1EC',
+  },
+  otherAlarmDescRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 8,
+  },
+  otherAlarmDesc: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12,
+    color: '#8B92A0',
+  },
+  otherAlarmBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  otherAlarmBadgeText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 10,
+    color: '#8B92A0',
+  },
+  routineCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#171B22',
+    borderRadius: 16,
+    padding: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#BA7517',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  routineIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  routineTextContainer: {
+    flex: 1,
+  },
+  routineTitleText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 14,
+    color: '#F3F1EC',
+  },
+  routineDescText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    color: '#8B92A0',
+    marginTop: 2,
+  },
+  addAlarmBtn: {
+    backgroundColor: '#E5E7EB',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    marginBottom: 20,
+    width: '100%',
+  },
+  addAlarmBtnText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 14,
+    color: '#0F1115',
+  },
+  sensorHelpText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    color: '#8B92A0',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+    paddingHorizontal: 16,
+  },
+  scrollPickerContainer: {
+    flexDirection: 'row',
+    height: 180,
+    backgroundColor: '#0F1115',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    marginVertical: 12,
+    position: 'relative',
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  scrollPickerIndicator: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    height: 60,
+    top: 60,
+    borderColor: 'rgba(186, 117, 23, 0.15)',
+    borderTopWidth: 1.5,
+    borderBottomWidth: 1.5,
+  },
+  scrollPickerCol: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollPickerItem: {
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  scrollPickerItemText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 16,
+    color: '#5A6070',
+  },
+  scrollPickerItemTextActive: {
+    color: '#BA7517',
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 18,
+  },
+  scrollPickerLabel: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 9,
+    color: '#5A6070',
+    position: 'absolute',
+    bottom: 2,
+    textTransform: 'uppercase',
+  },
+  scrollPickerSeparator: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 22,
+    color: '#BA7517',
+    paddingBottom: 0,
+  },
 });

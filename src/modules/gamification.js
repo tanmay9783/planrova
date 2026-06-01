@@ -23,6 +23,51 @@ const PET_STAGES = [
 export function initGamification() {
   checkDailyReset();
   updateUI();
+  setupShareButton();
+}
+
+function setupShareButton() {
+  const shareBtn = document.getElementById('share-wrapped-btn');
+  if (shareBtn) {
+    shareBtn.addEventListener('click', async () => {
+      shareBtn.textContent = "Generating... ⏳";
+      try {
+        // Load html2canvas dynamically
+        if (!window.html2canvas) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+        }
+        
+        const card = document.getElementById('week-review-content');
+        // Hide the share button during capture
+        shareBtn.style.display = 'none';
+        
+        const canvas = await window.html2canvas(card, {
+          backgroundColor: null,
+          scale: 2
+        });
+        
+        shareBtn.style.display = '';
+        
+        const imgData = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = 'planory-week-wrapped.png';
+        link.href = imgData;
+        link.click();
+        
+        shareBtn.textContent = "📤 Share card";
+      } catch (err) {
+        console.error("html2canvas failed", err);
+        shareBtn.textContent = "Failed to export";
+        alert("Failed to export. Take a standard screenshot instead!");
+      }
+    });
+  }
 }
 
 function checkDailyReset() {
@@ -126,17 +171,35 @@ function updateUI() {
       petContainer.style.animation = 'floatFlame 3s ease-in-out infinite alternate';
     }
   }
+
+  // 3. Update Daily Score Ring
+  const ringFill = document.getElementById('daily-score-ring-fill');
+  const scoreLetter = document.getElementById('daily-score-letter');
+  const tooltip = document.getElementById('score-tooltip');
   
-  // 3. Update Daily Score
-  const scoreDisplay = document.getElementById('daily-score-display');
-  if (scoreDisplay) {
-    const score = calculateDailyScore(state);
-    scoreDisplay.textContent = score;
+  const scoreBreakdown = calculateDailyScoreNumeric(state);
+  const scoreVal = scoreBreakdown.score;
+  const grade = getLetterGrade(scoreVal);
+  
+  if (scoreLetter) scoreLetter.textContent = grade;
+  if (ringFill) {
+    // 100 is max. Circumference of radius 16 circle is 100.53
+    const circumference = 100.53;
+    const offset = circumference - (Math.min(100, scoreVal) / 100) * circumference;
+    ringFill.style.strokeDashoffset = offset;
     
-    // Change color based on score
-    if (score === 'A+' || score === 'A') scoreDisplay.style.color = '#34d399'; // Green
-    else if (score === 'B' || score === 'C') scoreDisplay.style.color = '#a78bfa'; // Purple
-    else scoreDisplay.style.color = '#f87171'; // Red
+    // Green when doing well: red < 40, amber 40-70, green > 70
+    if (scoreVal >= 70) {
+      ringFill.style.stroke = '#34d399'; // Green
+    } else if (scoreVal >= 40) {
+      ringFill.style.stroke = '#fbbf24'; // Amber
+    } else {
+      ringFill.style.stroke = '#f87171'; // Red
+    }
+  }
+  
+  if (tooltip) {
+    tooltip.textContent = `Tasks ${scoreBreakdown.tasks}% + Focus ${scoreBreakdown.focus}% + Habits ${scoreBreakdown.habits}% + Water ${scoreBreakdown.water}%`;
   }
   
   // 4. Update Streak Aura Class
@@ -150,18 +213,22 @@ function updateUI() {
   }
 }
 
-function calculateDailyScore(state) {
-  let score = 0;
+export function calculateDailyScoreNumeric(state) {
+  let tasksPoints = Math.min(40, (state.tasksCompletedToday || 0) * 10);
+  let focusPoints = Math.min(30, (state.focusMinutesToday || 0));
+  let habitsPoints = Math.min(20, (state.habitsCompletedToday || 0) * 5);
+  let waterPoints = Math.min(10, (state.waterLoggedToday || 0) * 2);
   
-  // Points for tasks
-  score += Math.min(50, state.tasksCompletedToday * 10);
-  
-  // Points for focus (1 point per minute up to 30)
-  score += Math.min(30, state.focusMinutesToday);
-  
-  // Points for water
-  score += Math.min(20, state.waterLoggedToday * 5); // Assuming waterLoggedToday is number of times logged
-  
+  return {
+    score: tasksPoints + focusPoints + habitsPoints + waterPoints,
+    tasks: tasksPoints,
+    focus: focusPoints,
+    habits: habitsPoints,
+    water: waterPoints
+  };
+}
+
+function getLetterGrade(score) {
   if (score >= 90) return 'A+';
   if (score >= 80) return 'A';
   if (score >= 70) return 'B';
@@ -170,18 +237,36 @@ function calculateDailyScore(state) {
   return 'F';
 }
 
+function calculateWeeklyGrade(tasksCount) {
+  if (tasksCount >= 25) return 'A+';
+  if (tasksCount >= 20) return 'A';
+  if (tasksCount >= 16) return 'B+';
+  if (tasksCount >= 12) return 'C+';
+  if (tasksCount >= 8) return 'C';
+  if (tasksCount >= 4) return 'D';
+  return 'F';
+}
+
 export function populateWeekInReview() {
   const state = getStorageItem(GAMIFICATION_KEY, defaultState);
   
-  // In a real app we would aggregate 7 days of logs.
-  // For demo aesthetics, we'll calculate based on current state + some flavor
-  const score = calculateDailyScore(state);
-  document.getElementById('wr-score').textContent = score;
-  document.getElementById('wr-tasks').textContent = Math.max(state.tasksCompletedToday * 4, 12); // Simulated weekly
-  document.getElementById('wr-focus').textContent = `${Math.max(Math.floor(state.focusMinutesToday * 3 / 60), 2)}h`;
+  const weeklyTasks = Math.max(state.tasksCompletedToday * 4, 12);
+  const weeklyFocusMins = Math.max(state.focusMinutesToday * 3, 120);
+  const focusHours = Math.round(weeklyFocusMins / 60);
+  
+  const grade = calculateWeeklyGrade(weeklyTasks);
+  
+  const scoreEl = document.getElementById('wr-score');
+  const tasksEl = document.getElementById('wr-tasks');
+  const focusEl = document.getElementById('wr-focus');
+  const bestDayEl = document.getElementById('wr-best-day');
+  
+  if (scoreEl) scoreEl.textContent = grade;
+  if (tasksEl) tasksEl.textContent = weeklyTasks;
+  if (focusEl) focusEl.textContent = `${focusHours}h`;
   
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  document.getElementById('wr-best-day').textContent = days[new Date().getDay() - 1] || 'Friday';
+  if (bestDayEl) bestDayEl.textContent = days[new Date().getDay() - 1] || 'Friday';
 }
 
 function playLevelUpEffect(level) {

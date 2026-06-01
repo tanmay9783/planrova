@@ -84,7 +84,7 @@ export function getAmbientGlow(profile) {
       };
     default:
       return {
-        topColor: '#C2A878',
+        topColor: '#BA7517',
         bottomColor: '#4B6BFB',
         opacity: 0.06,
       };
@@ -132,10 +132,10 @@ export function getThemeConfig() {
   // Default values
   const config = {
     themeId: theme,
-    primaryColor: '#C2A878', // Classic Gold
+    primaryColor: '#BA7517', // Classic Gold
     accentColor: '#4B6BFB',  // Classic Indigo Blue
     streakIcon: 'flame',
-    streakColor: '#C2A878',
+    streakColor: '#BA7517',
     greetingPrefix: '',
     brandingMessage: '',
     countdownTitle: 'Exam Countdown',
@@ -151,9 +151,9 @@ export function getThemeConfig() {
       config.brandingMessage = 'Light up your study desk with focus. 🪔';
       break;
     case 'exams':
-      config.primaryColor = '#E11D48'; // Urgent Rose/Red
-      config.accentColor = '#EF4444';  // Urgency Red
-      config.streakColor = '#E11D48';
+      config.primaryColor = '#BA7517'; // Accent Gold
+      config.accentColor = '#BA7517';  // Accent Gold
+      config.streakColor = '#BA7517';  // Accent Gold
       config.greetingPrefix = 'Exam Week';
       config.brandingMessage = 'Exam Season Mode is active. Focus, grind, succeed! 📚';
       break;

@@ -33,7 +33,7 @@ const { width } = Dimensions.get('window');
 
 // SwipeWrapper component to intercept swipes and navigate between tabs
 function SwipeWrapper({ children, navigation, route }) {
-  const tabNames = ['Home', 'Habits', 'Timer', 'Schedule'];
+  const tabNames = ['Home', 'Habits', 'Notes', 'Timer', 'Schedule'];
   const currentIndex = tabNames.indexOf(route.name);
 
   const panResponder = useRef(
@@ -197,9 +197,21 @@ export default function TabNavigator() {
     Vibration.vibrate(40);
   };
 
+  const cleanNoteTextForPreview = (text) => {
+    if (!text) return '';
+    let cleaned = text;
+    cleaned = cleaned.replace(/---/g, '');
+    cleaned = cleaned.replace(/\[OCR SCAN:[^\]]*\]/gi, '');
+    cleaned = cleaned.replace(/#+\s*/g, '');
+    cleaned = cleaned.replace(/\*\*|__|\*|_|`|~/g, '');
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    return cleaned;
+  };
+
   const handleAddNote = () => {
     if (!noteContent.trim()) return;
-    const autoTitle = noteContent.trim().split('\n')[0].substring(0, 40).trim() || 'Untitled Note';
+    const cleanContent = cleanNoteTextForPreview(noteContent);
+    const autoTitle = cleanContent.substring(0, 40).trim() || 'Untitled Note';
     const newNote = {
       id: Date.now().toString(),
       subject: noteSubject.trim() || 'General',
@@ -245,7 +257,7 @@ export default function TabNavigator() {
             shadowOpacity: 0.1,
             shadowRadius: 10,
           },
-          tabBarActiveTintColor: '#C2A878',
+          tabBarActiveTintColor: '#BA7517',
           tabBarInactiveTintColor: '#5A6070',
           tabBarShowLabel: true,
           tabBarIcon: ({ focused, color }) => {
@@ -267,7 +279,7 @@ export default function TabNavigator() {
                     borderRadius: 15,
                   },
                   focused && {
-                    backgroundColor: 'rgba(194, 168, 120, 0.15)',
+                    backgroundColor: 'rgba(186, 117, 23, 0.15)',
                   }
                 ]}
               >
@@ -275,12 +287,19 @@ export default function TabNavigator() {
               </View>
             );
           },
-          tabBarLabelStyle: {
-            fontFamily: 'PlusJakartaSans_600SemiBold',
-            fontSize: 10,
-            marginTop: 4,
-            marginBottom: Platform.OS === 'ios' ? 0 : 4,
-          }
+          tabBarLabel: ({ focused, color }) => (
+            <Text 
+              style={{
+                fontFamily: focused ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_600SemiBold',
+                fontSize: focused ? 10.5 : 9,
+                color: color,
+                marginTop: 2,
+                marginBottom: Platform.OS === 'ios' ? 0 : 4,
+              }}
+            >
+              {route.name}
+            </Text>
+          )
         })}
       >
         <Tab.Screen name="Home">
@@ -297,7 +316,13 @@ export default function TabNavigator() {
             </SwipeWrapper>
           )}
         </Tab.Screen>
-
+        <Tab.Screen name="Notes">
+          {props => (
+            <SwipeWrapper {...props}>
+              <NotesScreen />
+            </SwipeWrapper>
+          )}
+        </Tab.Screen>
         <Tab.Screen name="Timer">
           {props => (
             <SwipeWrapper {...props}>
@@ -470,11 +495,11 @@ export default function TabNavigator() {
                   }
                 ]}
               >
-                <Ionicons name="star" size={16} color="#C2A878" />
+                <Ionicons name="star" size={16} color="#BA7517" />
               </Animated.View>
             ))}
 
-            <Ionicons name="trophy" size={72} color="#C2A878" style={styles.trophyIcon} />
+            <Ionicons name="trophy" size={72} color="#BA7517" style={styles.trophyIcon} />
             <Text style={styles.levelUpTitle}>LEVEL UP!</Text>
             <Text style={styles.levelUpSubtitle}>Congratulations Grinder!</Text>
             
@@ -513,11 +538,11 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
-    shadowColor: '#C2A878',
+    shadowColor: '#BA7517',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -557,7 +582,7 @@ const styles = StyleSheet.create({
     color: '#5A6070'
   },
   modalTabTextActive: {
-    color: '#C2A878'
+    color: '#BA7517'
   },
   form: {
     marginBottom: 12
@@ -583,7 +608,7 @@ const styles = StyleSheet.create({
     marginBottom: 16
   },
   submitBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
@@ -615,7 +640,7 @@ const styles = StyleSheet.create({
     width: width * 0.85,
     backgroundColor: '#171B22',
     borderWidth: 1.5,
-    borderColor: 'rgba(194, 168, 120, 0.25)',
+    borderColor: 'rgba(186, 117, 23, 0.25)',
     borderRadius: 28,
     padding: 32,
     alignItems: 'center',
@@ -628,7 +653,7 @@ const styles = StyleSheet.create({
   },
   trophyIcon: {
     marginBottom: 16,
-    shadowColor: '#C2A878',
+    shadowColor: '#BA7517',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 15,
@@ -636,7 +661,7 @@ const styles = StyleSheet.create({
   levelUpTitle: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 32,
-    color: '#C2A878',
+    color: '#BA7517',
     letterSpacing: 2
   },
   levelUpSubtitle: {
@@ -650,9 +675,9 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: 'rgba(194, 168, 120, 0.1)',
+    backgroundColor: 'rgba(186, 117, 23, 0.1)',
     borderWidth: 2,
-    borderColor: '#C2A878',
+    borderColor: '#BA7517',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16
@@ -684,7 +709,7 @@ const styles = StyleSheet.create({
     gap: 12
   },
   shareBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',

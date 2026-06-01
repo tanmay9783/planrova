@@ -180,8 +180,8 @@ export default function HabitsScreen() {
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh} 
-              colors={['#C2A878']} 
-              tintColor="#C2A878" 
+              colors={['#BA7517']} 
+              tintColor="#BA7517" 
             />
           }
         >
@@ -231,7 +231,7 @@ export default function HabitsScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <Text style={styles.sectionTitle}>DAILY HABITS</Text>
             <TouchableOpacity onPress={() => setShowAddHabit(true)} style={{ padding: 4 }}>
-              <Ionicons name="add" size={20} color="#C2A878" />
+              <Ionicons name="add" size={20} color="#BA7517" />
             </TouchableOpacity>
           </View>
 
@@ -275,7 +275,7 @@ export default function HabitsScreen() {
                       )}
                     </Animated.View>
                     <View style={styles.habitIconContainer}>
-                      <Ionicons name={h.icon || 'star-outline'} size={14} color={isCompleted ? '#C2A878' : '#8B92A0'} />
+                      <Ionicons name={h.icon || 'star-outline'} size={14} color={isCompleted ? '#BA7517' : '#8B92A0'} />
                     </View>
                     <Text style={[styles.habitTitle, isCompleted && styles.habitTitleCompleted]}>
                       {h.name}
@@ -351,7 +351,7 @@ export default function HabitsScreen() {
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={[styles.modalActionBtn, { backgroundColor: '#C2A878' }]} 
+                style={[styles.modalActionBtn, { backgroundColor: '#BA7517' }]} 
                 onPress={handleAddHabit}
               >
                 <Text style={[styles.modalActionBtnText, { color: '#0F1115' }]}>Add Habit</Text>
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 80,
-    backgroundColor: 'rgba(194, 168, 120, 0.22)',
+    backgroundColor: 'rgba(186, 117, 23, 0.22)',
     transform: [{ skewX: '-25deg' }],
   },
   
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     elevation: 2
   },
   checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', marginRight: 16, backgroundColor: '#0F1115' },
-  checkboxChecked: { backgroundColor: '#C2A878', borderColor: '#C2A878' },
+  checkboxChecked: { backgroundColor: '#BA7517', borderColor: '#BA7517' },
   habitTitle: { flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, color: '#F3F1EC' },
   habitTitleCompleted: { color: '#8B92A0', textDecorationLine: 'line-through' },
   
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
   progressValueText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 11,
-    color: '#C2A878',
+    color: '#BA7517',
   },
   progressBarBg: {
     height: 6,
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 3,
   },
   habitIconContainer: { width: 24, height: 24, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
@@ -538,8 +538,8 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   iconSelectBtnActive: {
-    backgroundColor: '#C2A878',
-    borderColor: '#C2A878'
+    backgroundColor: '#BA7517',
+    borderColor: '#BA7517'
   },
   modalActions: {
     flexDirection: 'row',

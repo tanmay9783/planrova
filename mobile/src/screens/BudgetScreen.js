@@ -4,15 +4,18 @@ import { useFirestoreData } from '../hooks/useFirestoreData';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../firebase';
 import { awardXP } from '../utils/xpManager';
+import { useRoute } from '@react-navigation/native';
 
 const BUDGET_PRESETS = [
-  { name: 'Chai & samosa', amount: 20, category: 'Food', icon: 'cafe-outline', color: '#C2A878' },
+  { name: 'Chai & samosa', amount: 20, category: 'Food', icon: 'cafe-outline', color: '#BA7517' },
   { name: 'Tapri maggi', amount: 40, category: 'Food', icon: 'restaurant-outline', color: '#7C9B7A' },
   { name: 'Xerox & prints', amount: 10, category: 'Books', icon: 'document-outline', color: '#4B6BFB' },
   { name: 'Auto / metro', amount: 30, category: 'Transport', icon: 'car-outline', color: '#C47070' }
 ];
 
 export default function BudgetScreen() {
+  const route = useRoute();
+  const amountInputRef = useRef(null);
   const userId = auth.currentUser ? auth.currentUser.uid : 'guest';
   const [expenses, setExpenses] = useFirestoreData('expenses', []);
   const [settings, setSettings] = useFirestoreData('budget_settings', {
@@ -50,6 +53,15 @@ export default function BudgetScreen() {
     setEditGoalTarget(settings.savingsGoalTarget.toString());
     setEditGoalCurrent(settings.savingsGoalCurrent.toString());
   }, [settings]);
+
+  useEffect(() => {
+    if (route.params?.action === 'log_expense') {
+      setIsLoggerExpanded(true);
+      setTimeout(() => {
+        amountInputRef.current?.focus();
+      }, 100);
+    }
+  }, [route.params?.action]);
 
   const autoCategorize = (desc) => {
     const d = desc.toLowerCase();
@@ -332,7 +344,7 @@ export default function BudgetScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.actionBtnSecondary} onPress={() => setIsEditingSettings(!isEditingSettings)}>
-              <Ionicons name="create-outline" size={16} color="#C2A878" style={{ marginRight: 6 }} />
+              <Ionicons name="create-outline" size={16} color="#BA7517" style={{ marginRight: 6 }} />
               <Text style={styles.actionBtnSecondaryText}>Edit limits</Text>
             </TouchableOpacity>
           </View>
@@ -345,7 +357,7 @@ export default function BudgetScreen() {
               onPress={() => setIsLoggerExpanded(!isLoggerExpanded)}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="add-circle-outline" size={18} color="#C2A878" style={{ marginRight: 8 }} />
+                <Ionicons name="add-circle-outline" size={18} color="#BA7517" style={{ marginRight: 8 }} />
                 <Text style={styles.collapsibleHeaderTitle}>Add new expense</Text>
               </View>
               <Ionicons
@@ -358,6 +370,7 @@ export default function BudgetScreen() {
             {isLoggerExpanded && (
               <View style={styles.collapsibleContent}>
                 <TextInput
+                  ref={amountInputRef}
                   style={styles.amountInput}
                   placeholder="₹ Amount"
                   placeholderTextColor="#5A6070"
@@ -399,7 +412,7 @@ export default function BudgetScreen() {
                     const total = categoryTotals[cat];
                     const pct = totalSpent > 0 ? (total / totalSpent) * 100 : 0;
                     let barColor = '#8B92A0';
-                    if (cat === 'Food') barColor = '#C2A878';
+                    if (cat === 'Food') barColor = '#BA7517';
                     else if (cat === 'Transport') barColor = '#4B6BFB';
                     else if (cat === 'Books') barColor = '#7C9B7A';
                     else if (cat === 'Fun') barColor = '#C47070';
@@ -440,7 +453,7 @@ export default function BudgetScreen() {
             expenses.slice(0, 8).map(e => {
               let itemIcon = 'receipt-outline';
               let iconColor = '#8B92A0';
-              if (e.category === 'Food') { itemIcon = 'cafe-outline'; iconColor = '#C2A878'; }
+              if (e.category === 'Food') { itemIcon = 'cafe-outline'; iconColor = '#BA7517'; }
               else if (e.category === 'Transport') { itemIcon = 'car-outline'; iconColor = '#4B6BFB'; }
               else if (e.category === 'Books') { itemIcon = 'document-outline'; iconColor = '#7C9B7A'; }
               else if (e.category === 'Fun') { itemIcon = 'game-controller-outline'; iconColor = '#C47070'; }
@@ -546,7 +559,7 @@ export default function BudgetScreen() {
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity 
-                  style={[styles.modalActionBtn, { backgroundColor: '#C2A878' }]} 
+                  style={[styles.modalActionBtn, { backgroundColor: '#BA7517' }]} 
                   onPress={calculateSplitShare}
                 >
                   <Text style={[styles.modalActionBtnText, { color: '#0F1115' }]}>Calculate</Text>
@@ -584,7 +597,7 @@ const styles = StyleSheet.create({
   monthBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 12,
-    color: '#C2A878'
+    color: '#BA7517'
   },
   warningBanner: {
     flexDirection: 'row',
@@ -636,7 +649,7 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   saveSettingsBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 8,
     padding: 12,
     alignItems: 'center',
@@ -781,7 +794,7 @@ const styles = StyleSheet.create({
   presetPriceText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 11,
-    color: '#C2A878',
+    color: '#BA7517',
     marginTop: 2
   },
   actionsRow: {
@@ -791,7 +804,7 @@ const styles = StyleSheet.create({
   },
   actionBtnPrimary: {
     flex: 1,
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 12,
     paddingVertical: 12,
     flexDirection: 'row',
@@ -817,7 +830,7 @@ const styles = StyleSheet.create({
   actionBtnSecondaryText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 13,
-    color: '#C2A878'
+    color: '#BA7517'
   },
   collapsibleCard: {
     backgroundColor: '#171B22',
@@ -866,7 +879,7 @@ const styles = StyleSheet.create({
     fontSize: 14
   },
   logSubmitBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
@@ -1050,7 +1063,7 @@ const styles = StyleSheet.create({
   splitResultVal: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 28,
-    color: '#C2A878',
+    color: '#BA7517',
     marginTop: 4
   },
   splitResultSub: {
@@ -1079,7 +1092,7 @@ const styles = StyleSheet.create({
     lineHeight: 18
   },
   emptyStateBtn: {
-    backgroundColor: 'rgba(194, 168, 120, 0.12)',
+    backgroundColor: 'rgba(186, 117, 23, 0.12)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 10,
@@ -1088,6 +1101,6 @@ const styles = StyleSheet.create({
   emptyStateBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 11,
-    color: '#C2A878'
+    color: '#BA7517'
   }
 });

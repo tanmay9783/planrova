@@ -61,7 +61,7 @@
     <aside class="sidebar" id="sidebar">
       <!-- Profile displaying name, avatar and short bio -->
       <div class="sidebar-profile" id="sidebar-profile">
-        <div style="display: flex; width: 100%; align-items: center; gap: 16px;">
+        <div style="display: flex; width: 100%; align-items: center; gap: 16px;" class="profile-header-wrap">
           <div class="avatar-ring-container">
             <svg class="avatar-xp-ring" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="44" stroke="rgba(255,255,255,0.03)" stroke-width="4" fill="none"></circle>
@@ -72,7 +72,7 @@
           <div class="profile-info" style="flex:1;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <span class="profile-name" id="profile-name-display">Tanmay</span>
-              <div style="display:flex; gap:6px;">
+              <div style="display:flex; gap:6px;" class="profile-actions">
                 <button class="icon-btn" id="auth-login-btn" title="Enable Cloud Sync" style="font-size:12px; color:var(--text-muted);">☁️ Off</button>
                 <button class="icon-btn" id="edit-profile-btn" title="Edit Profile" style="font-size:12px; opacity:0.6;">✏️</button>
               </div>
@@ -83,7 +83,7 @@
         
         <!-- Level Progress Bar -->
         <div class="level-container" style="width: 100%; margin-top: 8px;">
-          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+          <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;" class="level-text-wrap">
             <span id="level-display" style="color: var(--accent);">Level 1</span>
             <span id="xp-display">0 / 100 XP</span>
           </div>
@@ -91,16 +91,22 @@
             <div class="budget-progress-fill" id="xp-progress-fill" style="width: 0%; background: var(--accent-gradient);"></div>
           </div>
         </div>
+
+        <!-- Live Studying Counter (Moved to sidebar!) -->
+        <div class="presence-widget" id="presence-widget-sidebar" style="display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 11px; color: var(--accent); font-weight: 600;">
+          <span class="presence-dot" style="width: 6px; height: 6px; background: var(--accent); border-radius: 50%; display: inline-block; animation: pulse 2s infinite;"></span>
+          <span id="presence-count-sidebar">12 studying now</span>
+        </div>
       </div>
 
       <!-- Streak info and Virtual Pet -->
       <div class="sidebar-section toggle-collapse" data-target="streak-pet-section">
         <div class="section-header">
-          <span>Focus</span>
+          <span>Focus & Daily Score</span>
         </div>
         <div id="streak-pet-section" class="sidebar-section-body" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
           <div class="streak-card">
-            <div class="streak-flame">—</div>
+            <div class="streak-flame">🔥</div>
             <div class="streak-info">
               <div class="streak-count" id="streak-count">0</div>
               <div class="streak-label">Day Streak</div>
@@ -108,26 +114,56 @@
             <div class="streak-badges" id="streak-badges"></div>
           </div>
           
-          <!-- Virtual Focus Pet / Productivity Score -->
-          <div class="streak-card pet-card">
-            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
-              <div class="streak-info">
-                <div class="streak-count" id="daily-score-display" style="color: #aa95cc; font-size: 24px;">0</div>
-                <div class="streak-label">Daily Score</div>
+          <!-- Virtual Focus Pet / Productivity Score Ring -->
+          <div class="streak-card pet-card" style="position:relative;">
+            <div style="display: flex; justify-content: space-between; width: 100%; align-items: center; gap: 12px;">
+              <div class="daily-score-ring-wrapper" id="daily-score-ring-wrapper" style="position: relative; width: 60px; height: 60px; cursor: pointer; flex-shrink:0;">
+                <svg viewBox="0 0 36 36" style="width: 100%; height: 100%; transform: rotate(-90deg);">
+                  <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="3"></circle>
+                  <circle cx="18" cy="18" r="16" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.53" stroke-dashoffset="100.53" id="daily-score-ring-fill" style="transition: stroke-dashoffset 0.6s ease, stroke 0.6s ease;"></circle>
+                </svg>
+                <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index:2;">
+                  <span id="daily-score-letter" style="font-size: 14px; font-weight: 700; color: #fff;">F</span>
+                  <span style="font-size: 7px; color: var(--text-secondary); text-transform: uppercase;">Score</span>
+                </div>
+                <!-- Breakdown Tooltip -->
+                <div class="score-tooltip" id="score-tooltip" style="position:absolute; top:-40px; left:50%; transform:translateX(-50%); background:#222; border:1px solid var(--border-color); padding:6px 10px; border-radius:6px; font-size:10px; color:#fff; white-space:nowrap; pointer-events:none; opacity:0; transition:opacity 0.2s ease; z-index:10;">
+                  Tasks 0% + Focus 0% + Habits 0% + Water 0%
+                </div>
               </div>
-              <div id="virtual-pet-container" style="font-size: 32px; filter: drop-shadow(0 0 8px rgba(170,149,204,0.4)); animation: floatFlame 3s ease-in-out infinite alternate; cursor: pointer;" title="Your Focus Pet. Complete tasks to grow it!">🌱</div>
+              
+              <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Daily Score</span>
+                  <div id="virtual-pet-container" style="font-size: 22px; filter: drop-shadow(0 0 8px rgba(186,117,23,0.4)); animation: floatFlame 3s ease-in-out infinite alternate; cursor: pointer;" title="Your Focus Pet. Complete tasks to grow it!">🌱</div>
+                </div>
+                <div class="helper-text" id="pet-status-msg" style="font-size: 11px; line-height: 1.3; color: var(--text-secondary);">Your plant is sprouting! Add tasks and focus to grow it.</div>
+              </div>
             </div>
-            <div class="helper-text" id="pet-status-msg" style="font-size: 11px; line-height: 1.3; color: var(--text-secondary); margin-top: 6px;">Your plant is sprouting! Add tasks and focus to grow it.</div>
           </div>
         </div>
       </div>
 
       <!-- Clean view selection toggles -->
       <div class="sidebar-section">
-        <div class="view-selector" style="flex-direction: column; gap: 6px; background: none; border: none; padding: 0;">
-          <button class="view-tab active full-width" id="view-weekly-btn" style="text-align: left; padding: 10px 14px;">Weekly Timetable</button>
-          <button class="view-tab full-width" id="view-calendar-btn" style="text-align: left; padding: 10px 14px;">Month Calendar</button>
-        </div>
+        <nav class="sidebar-nav" style="display:flex; flex-direction: column; gap: 4px;">
+          <button class="nav-item active" id="view-weekly-btn" style="text-align: left; padding: 10px 14px; display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; border-radius:8px;">
+            <span class="nav-icon" style="font-size:16px;">🏠</span>
+            <span class="nav-text">Home Timetable</span>
+          </button>
+          <button class="nav-item" id="view-calendar-btn" style="text-align: left; padding: 10px 14px; display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; border-radius:8px;">
+            <span class="nav-icon" style="font-size:16px;">📅</span>
+            <span class="nav-text">Month Calendar</span>
+          </button>
+          <button class="nav-item" id="sidebar-nav-notes" style="text-align: left; padding: 10px 14px; display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; border-radius:8px;">
+            <span class="nav-icon" style="font-size:16px;">📝</span>
+            <span class="nav-text">Subject Notes</span>
+          </button>
+          <button class="nav-item" id="sidebar-nav-timer" style="text-align: left; padding: 10px 14px; display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; border-radius:8px;">
+            <span class="nav-icon" style="font-size:16px;">⏱️</span>
+            <span class="nav-text">Focus Timer</span>
+          </button>
+        </nav>
       </div>
 
       <!-- Quick Hydration Sidebar mini widget -->
@@ -185,26 +221,22 @@
       <!-- Clean Top Bar -->
       <header class="top-bar">
         <div class="top-bar-left">
+          <!-- Sidebar collapse toggle button -->
+          <button class="icon-btn" id="sidebar-toggle" title="Toggle Sidebar" style="font-size: 20px; margin-right: 12px;">☰</button>
           <!-- HAMBURGER MENU: Opens the Unified Premium Productivity Hub Overlay -->
-          <button class="sidebar-toggle" id="global-hub-hamburger-btn" title="Open Apps Menu Drawer" style="font-size:22px; color:var(--accent); font-weight:bold; margin-right:12px;">☰ Apps</button>
+          <button class="sidebar-toggle" id="global-hub-hamburger-btn" title="Open Apps Menu Drawer" style="font-size:13px; color:var(--accent); font-weight:700; margin-right:12px; background:rgba(186,117,23,0.1); padding: 6px 12px; border-radius: 8px;">Apps</button>
           <div class="app-brand">
             <span class="brand-icon" style="font-size: 20px; color: var(--text-primary);">⬡</span>
             <span class="brand-name" style="font-weight: 700; letter-spacing: -0.5px;">Planory</span>
           </div>
         </div>
 
-        <!-- Intentions Mantra / Quote bar -->
-        <div class="daily-quote-bar" id="daily-quote-bar">
-          <span class="quote-text" id="quote-text">Start your day with clear intentions...</span>
-          <button class="icon-btn" id="refresh-quote-btn" title="New Quote" style="font-size: 13px; opacity: 0.5;">↺</button>
-        </div>
-
         <div class="top-bar-right">
-          <div class="presence-widget" id="presence-widget" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(111,138,183,0.1); border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--accent); margin-right: 12px;">
-            <span class="presence-dot" style="width: 6px; height: 6px; background: var(--accent); border-radius: 50%; animation: pulse 2s infinite;"></span>
-            <span id="presence-count">12 studying now</span>
-          </div>
-          <button class="icon-btn" id="theme-toggle-btn" title="Toggle Theme" style="font-size: 16px; margin-right: 8px; opacity: 0.65;">◑</button>
+          <!-- Search button for Command Palette (indicates Ctrl+K) -->
+          <button class="icon-btn" id="global-search-btn" title="Search Workspace (Ctrl+K)" style="font-size: 15px; margin-right: 12px; opacity: 0.65; display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.03); padding:6px 12px; border-radius:8px; border:1px solid var(--border-color);">
+            <span>🔍</span> <span style="font-size:11px; color:var(--text-secondary);">Search (Ctrl+K)</span>
+          </button>
+          <button class="icon-btn" id="theme-toggle-btn" title="Toggle Theme" style="font-size: 16px; margin-right: 8px; opacity: 0.65;">🌓</button>
           <button class="icon-btn" id="zen-mode-btn" title="Zen Mode" style="font-size: 14px; margin-right: 12px; opacity: 0.65;">Zen</button>
           <button class="btn-voice" id="global-voice-btn" title="Voice add task" style="font-size: 14px;">◉</button>
           <div class="week-nav">
@@ -212,12 +244,57 @@
             <span class="week-label" id="week-label">This Week</span>
             <button class="nav-btn" id="next-week-btn">›</button>
           </div>
-          <button class="btn-primary" id="add-task-btn">+ Add Task</button>
+          <button class="btn-primary" id="add-task-btn" style="border-radius:20px; font-weight:700;">+ Add Task</button>
         </div>
       </header>
 
       <!-- Weekly Ruled columns view -->
       <div class="weekly-grid-container" id="weekly-grid-view">
+        <!-- Mobile Header Dashboard (only visible on screens < 768px) -->
+        <div class="mobile-home-header" id="mobile-home-header" style="margin-bottom:16px;">
+          <!-- Level and Streak Row -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:20px;">🎖️</span>
+              <div style="display:flex; flex-direction:column;">
+                <span id="mobile-level-display" style="font-weight:700; font-size:12px; color:var(--accent);">Level 1</span>
+                <span id="mobile-xp-display" style="font-size:10px; color:var(--text-secondary);">0 / 100 XP</span>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.03); padding:4px 10px; border-radius:12px; border:1px solid var(--border-color);">
+              <span>🔥</span>
+              <span id="mobile-streak-display" style="font-size:11px; font-weight:700;">0</span>
+            </div>
+          </div>
+          
+          <!-- Water & Daily Score Row -->
+          <div style="display:flex; gap:12px;">
+            <div class="mobile-stat-pill" style="flex:1; display:flex; align-items:center; gap:8px; background:var(--bg-card); border:1px solid var(--border-color); padding:10px 14px; border-radius:12px;">
+              <span style="font-size:18px;">💧</span>
+              <div style="display:flex; flex-direction:column;">
+                <span id="mobile-water-volume" style="font-size:12px; font-weight:700;">0 / 2000 ml</span>
+                <span id="mobile-water-pct" style="font-size:9px; color:var(--text-secondary);">0% complete</span>
+              </div>
+            </div>
+            <div class="mobile-stat-pill" style="flex:1; display:flex; align-items:center; gap:8px; background:var(--bg-card); border:1px solid var(--border-color); padding:10px 14px; border-radius:12px;">
+              <span id="mobile-pet-emoji" style="font-size:18px;">🌱</span>
+              <div style="display:flex; flex-direction:column;">
+                <span id="mobile-score-letter" style="font-size:12px; font-weight:700;">F Score</span>
+                <span style="font-size:9px; color:var(--text-secondary);">Plant is sprouting</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Daily Quote Widget (Moved from nav) -->
+        <div class="daily-quote-widget" id="daily-quote-widget" style="margin-bottom: 20px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display:flex; align-items:center; gap:12px; flex:1;">
+            <span style="font-size:24px; color:var(--accent); font-family:Georgia, serif; font-weight:bold; line-height:0.8;">“</span>
+            <span class="quote-text" id="quote-text" style="font-size: 13px; font-style: italic; color: var(--text-primary); line-height:1.4;">Start your day with clear intentions...</span>
+          </div>
+          <button class="icon-btn" id="refresh-quote-btn" title="New Quote" style="font-size: 14px; opacity: 0.6; margin-left:16px;">↺</button>
+        </div>
+
         <div class="weekly-grid">
           <!-- Left Column (Mon, Wed, Fri) -->
           <div class="left-col" id="left-col"></div>
@@ -256,7 +333,7 @@
       <div class="notes-drawer" style="width: 480px; background:#111014; animation: slideDrawer 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
         <div class="notes-drawer-header" style="border-bottom-color: rgba(255,255,255,0.06); padding: 24px;">
           <div style="display:flex; flex-direction:column; gap:4px;">
-            <h2 style="font-family:var(--font-display); font-size:22px; font-weight:800; background:linear-gradient(135deg,#fff,#a1a0a5); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">⚡ Radhe Workspace Hub</h2>
+            <h2 id="workspace-hub-title" class="workspace-hub-title">⚡ Radhe Workspace Hub</h2>
             <span class="helper-text">Select a productivity module to expand</span>
           </div>
           <button class="modal-close" id="apps-hub-close-btn" style="font-size:28px;">×</button>
@@ -265,7 +342,7 @@
           <!-- 1. Rich notes manager tile -->
           <div class="budget-card hub-tile" id="hub-tile-notes" style="cursor:pointer; transition: all 0.2s ease;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-              <span style="font-size: 24px;">📝</span>
+              <div class="hub-icon-circle">📝</div>
               <span class="badge" style="background: rgba(167, 139, 250, 0.1); color: #a78bfa; font-weight:600;">Rich Notes</span>
             </div>
             <h3 style="font-size:15px; font-weight:700; margin-bottom:4px;">Subject Notes & Text Editor</h3>
@@ -275,7 +352,7 @@
           <!-- 2. Daily hydration tracker tile -->
           <div class="budget-card hub-tile" id="hub-tile-water" style="cursor:pointer; transition: all 0.2s ease;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-              <span style="font-size: 24px;">💧</span>
+              <div class="hub-icon-circle">💧</div>
               <span class="badge" style="background: rgba(79, 140, 255, 0.1); color: #4f8cff; font-weight:600;">Water Log</span>
             </div>
             <h3 style="font-size:15px; font-weight:700; margin-bottom:4px;">Water Hydration Workspace</h3>
@@ -285,7 +362,7 @@
           <!-- 3. Expense Student Budget planner tile -->
           <div class="budget-card hub-tile" id="hub-tile-budget" style="cursor:pointer; transition: all 0.2s ease;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-              <span style="font-size: 24px;">💸</span>
+              <div class="hub-icon-circle">💸</div>
               <span class="badge" style="background: rgba(52, 211, 153, 0.1); color: #34d399; font-weight:600;">Student Budget</span>
             </div>
             <h3 style="font-size:15px; font-weight:700; margin-bottom:4px;">Expense Tracker & Savings goals</h3>
@@ -295,7 +372,7 @@
           <!-- 4. Focus Pomodoro focus trainer tile -->
           <div class="budget-card hub-tile" id="hub-tile-pomodoro" style="cursor:pointer; transition: all 0.2s ease;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-              <span style="font-size: 24px;">🍅</span>
+              <div class="hub-icon-circle">🍅</div>
               <span class="badge" style="background: rgba(239, 68, 68, 0.1); color: #f87171; font-weight:600;">Pomodoro Focus</span>
             </div>
             <h3 style="font-size:15px; font-weight:700; margin-bottom:4px;">Pomodoro Focus Timer</h3>
@@ -356,8 +433,9 @@
           </div>
 
           <!-- Sketch & Image Uploader -->
-          <div class="editor-file-drop" id="editor-file-drop">
-            <span style="font-size: 11px; color: var(--text-secondary);">📎 Drag & Drop or paste slide screenshots/diagrams</span>
+          <div class="editor-file-drop" id="editor-file-drop" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; border:1px dashed var(--border-color); border-radius:8px; margin-bottom:12px; cursor:pointer;">
+            <span style="font-size: 11px; color: var(--text-secondary);">📎 Drag & Drop slide screenshots/diagrams</span>
+            <button class="btn-ghost" id="note-ocr-scan-btn" style="padding: 4px 10px; font-size: 11px; border-radius: 6px;" type="button">📷 Scan Image</button>
             <input type="file" id="note-file-input" class="hidden" accept="image/*" />
           </div>
           <div id="note-attachments-preview" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;"></div>
@@ -395,9 +473,30 @@
         <button class="modal-close" id="notes-library-close-btn">×</button>
       </div>
       <div class="modal-body" style="max-height: 80vh; display:flex; flex-direction:column; gap:16px;">
-        <div style="display:flex; gap:12px; align-items:center;">
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
           <input type="text" id="notes-search-input" placeholder="🔍 Search page titles & note contents..." style="padding: 8px 16px; font-size:13px; flex:1;" />
+          
+          <!-- View Toggles -->
+          <div style="display:flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:8px; padding:2px;">
+            <button class="view-toggle-btn active" id="notes-view-grid" style="padding: 6px 12px; font-size:11px; border-radius:6px; cursor:pointer;" title="Grid View">Grid</button>
+            <button class="view-toggle-btn" id="notes-view-list" style="padding: 6px 12px; font-size:11px; border-radius:6px; cursor:pointer;" title="List View">List</button>
+            <button class="view-toggle-btn" id="notes-view-table" style="padding: 6px 12px; font-size:11px; border-radius:6px; cursor:pointer;" title="Table View">Table</button>
+          </div>
+          
+          <!-- Sort Dropdown -->
+          <select id="notes-sort-select" style="padding: 6px 12px; font-size:11px; border-radius:8px; background:rgba(255,255,255,0.03); border:1px solid var(--border-color);">
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="edited">Recently Edited</option>
+            <option value="title">Subject (A-Z)</option>
+          </select>
         </div>
+        
+        <!-- Subject Chips Filter -->
+        <div id="notes-subject-filters" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
+          <!-- Loaded dynamically -->
+        </div>
+        
         <div id="notes-library-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; overflow-y:auto; max-height: 480px;">
           <!-- Loaded dynamically -->
         </div>
@@ -536,6 +635,9 @@
               <button class="btn-ghost ambient-sound-btn" data-sound="lofi" style="padding: 8px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
                 <span>🎧</span> Lo-Fi Beats
               </button>
+              <button class="btn-ghost ambient-sound-btn" data-sound="sitar" style="padding: 8px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                <span>🪕</span> Sitar
+              </button>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
               <span style="font-size: 11px; color: var(--text-secondary); min-width: 45px;">Volume:</span>
@@ -636,84 +738,159 @@
 
   <!-- Settings Modal -->
   <div class="modal-overlay hidden" id="settings-modal-overlay">
-    <div class="modal wide-modal" id="settings-modal">
+    <div class="modal wide-modal" id="settings-modal" style="max-width: 800px;">
       <div class="modal-header">
-        <h2>Settings & Themes</h2>
+        <h2>Planory Settings</h2>
         <button class="modal-close" id="settings-close-btn">×</button>
       </div>
-      <div class="modal-body settings-body">
-        <div class="settings-tabs">
-          <button class="settings-tab active" data-tab="theme">🎨 Theme</button>
-          <button class="settings-tab" data-tab="quotes">💬 Quotes</button>
-          <button class="settings-tab" data-tab="profile">👤 Profile</button>
+      <div class="modal-body settings-body" style="display: flex; gap: 24px; min-height: 400px; padding: 20px;">
+        <div class="settings-tabs" style="display: flex; flex-direction: column; gap: 8px; width: 180px; border-right: 1px solid var(--border-color); padding-right: 16px;">
+          <button class="settings-tab active" data-tab="account" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">👤 Account</button>
+          <button class="settings-tab" data-tab="appearance" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">🎨 Appearance</button>
+          <button class="settings-tab" data-tab="study-pref" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">📚 Study Prefs</button>
+          <button class="settings-tab" data-tab="notifications" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">🔔 Notifications</button>
+          <button class="settings-tab" data-tab="data-manage" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">💾 Data & Privacy</button>
         </div>
-        <div class="settings-panel active" id="panel-theme">
-          <div class="setting-group">
-            <label>Accent Color</label>
-            <div class="color-swatches" id="color-swatches">
-              <button class="swatch active" data-color="#667eea" style="background:#667eea"></button>
-              <button class="swatch" data-color="#f093fb" style="background:#f093fb"></button>
-              <button class="swatch" data-color="#4facfe" style="background:#4facfe"></button>
-              <button class="swatch" data-color="#43e97b" style="background:#43e97b"></button>
-              <button class="swatch" data-color="#fa709a" style="background:#fa709a"></button>
-              <button class="swatch" data-color="#ffecd2" style="background:#ffecd2"></button>
-              <button class="swatch" data-color="#a18cd1" style="background:#a18cd1"></button>
-              <button class="swatch" data-color="#fd7013" style="background:#fd7013"></button>
+        
+        <div style="flex: 1; overflow-y: auto; max-height: 50vh; padding-right: 8px;">
+          <!-- 1. Account Panel -->
+          <div class="settings-panel active" id="panel-account" style="display: flex; flex-direction: column; gap: 16px;">
+            <h3>Account Profile</h3>
+            <div class="form-group">
+              <label>Name</label>
+              <input type="text" id="settings-name" placeholder="Your Name" />
+            </div>
+            <div class="form-group">
+              <label>Bio / Focus</label>
+              <input type="text" id="settings-bio" placeholder="e.g. Builder, Developer" />
+            </div>
+            <div class="form-group">
+              <label>Avatar</label>
+              <div class="avatar-picker" id="settings-avatar-picker" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <span class="avatar-opt" data-avatar="🦁">🦁</span>
+                <span class="avatar-opt" data-avatar="🐯">🐯</span>
+                <span class="avatar-opt" data-avatar="🦊">🦊</span>
+                <span class="avatar-opt" data-avatar="🐺">🐺</span>
+                <span class="avatar-opt" data-avatar="🦅">🦅</span>
+                <span class="avatar-opt" data-avatar="🐉">🐉</span>
+                <span class="avatar-opt" data-avatar="🌙">🌙</span>
+                <span class="avatar-opt" data-avatar="⚡">⚡</span>
+                <span class="avatar-opt" data-avatar="🔥">🔥</span>
+              </div>
+            </div>
+            <button class="btn-primary" id="save-profile-btn" style="margin-top: 12px; align-self: flex-start;">Save Profile</button>
+          </div>
+          
+          <!-- 2. Appearance Panel -->
+          <div class="settings-panel" id="panel-appearance" style="display: none; flex-direction: column; gap: 16px;">
+            <h3>Appearance</h3>
+            <div class="setting-row" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
+              <label style="text-transform: none; font-size: 13px; font-weight: 500;">Dark Theme Mode</label>
+              <button class="btn-ghost" id="settings-darkmode-toggle" style="padding: 6px 16px;">Dark</button>
+            </div>
+            <div class="setting-group" style="display: flex; flex-direction: column; gap: 8px;">
+              <label>Accent Color (5 options)</label>
+              <div class="color-swatches" id="color-swatches" style="display: flex; gap: 8px;">
+                <button class="swatch" data-color="#BA7517" style="background:#BA7517"></button>
+                <button class="swatch" data-color="#534AB7" style="background:#534AB7"></button>
+                <button class="swatch" data-color="#185FA5" style="background:#185FA5"></button>
+                <button class="swatch" data-color="#1D9E75" style="background:#1D9E75"></button>
+                <button class="swatch" data-color="#D85A30" style="background:#D85A30"></button>
+              </div>
+            </div>
+            <div class="setting-group" style="display: flex; flex-direction: column; gap: 8px;">
+              <label>Font Size</label>
+              <div style="display: flex; gap: 8px;" id="settings-fontsize-picker">
+                <button class="btn-ghost fontsize-btn" data-sz="S" style="flex:1;">S</button>
+                <button class="btn-ghost fontsize-btn active" data-sz="M" style="flex:1;">M</button>
+                <button class="btn-ghost fontsize-btn" data-sz="L" style="flex:1;">L</button>
+              </div>
+            </div>
+            <div class="setting-group" style="display: flex; flex-direction: column; gap: 8px;">
+              <label>Font Face</label>
+              <select id="font-picker">
+                <option value="Inter">Inter (Default)</option>
+                <option value="Outfit">Outfit</option>
+                <option value="Georgia">Georgia (Serif)</option>
+                <option value="monospace">Monospace</option>
+              </select>
+            </div>
+            <div class="setting-group" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+              <label>Background Pattern</label>
+              <div class="pattern-picker" id="pattern-picker" style="display: flex; gap: 8px;">
+                <button class="pattern-btn active" data-pattern="none" style="flex:1; padding: 6px;">None</button>
+                <button class="pattern-btn" data-pattern="dots" style="flex:1; padding: 6px;">Dots</button>
+                <button class="pattern-btn" data-pattern="grid" style="flex:1; padding: 6px;">Grid</button>
+                <button class="pattern-btn" data-pattern="noise" style="flex:1; padding: 6px;">Noise</button>
+              </div>
             </div>
           </div>
-          <div class="setting-group">
-            <label>Font</label>
-            <select id="font-picker">
-              <option value="Inter">Inter (Default)</option>
-              <option value="Outfit">Outfit</option>
-              <option value="Georgia">Georgia (Serif)</option>
-              <option value="monospace">Monospace</option>
-            </select>
+          
+          <!-- 3. Study Preferences Panel -->
+          <div class="settings-panel" id="panel-study-pref" style="display: none; flex-direction: column; gap: 16px;">
+            <h3>Study Preferences</h3>
+            <div class="form-group">
+              <label>Default Session Length (mins)</label>
+              <input type="number" id="settings-study-session" value="25" min="5" max="180" />
+            </div>
+            <div class="form-group">
+              <label>Default Break Duration (mins)</label>
+              <input type="number" id="settings-study-break" value="5" min="1" max="60" />
+            </div>
+            <div class="form-group">
+              <label>Ambient Sound Preference</label>
+              <select id="settings-study-sound">
+                <option value="none">No Sound</option>
+                <option value="rain">🌧️ Rain Storm</option>
+                <option value="cafe">☕ Busy Cafe</option>
+                <option value="lofi">🎧 Lo-Fi Beats</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Daily Goal Study Hours</label>
+              <input type="number" id="settings-study-goal" value="4" min="1" max="24" step="0.5" />
+            </div>
+            <button class="btn-primary" id="save-study-prefs-btn" style="margin-top: 12px; align-self: flex-start;">Save Study Prefs</button>
           </div>
-          <div class="setting-group">
-            <label>Background Pattern</label>
-            <div class="pattern-picker" id="pattern-picker">
-              <button class="pattern-btn active" data-pattern="none">None</button>
-              <button class="pattern-btn" data-pattern="dots">Dots</button>
-              <button class="pattern-btn" data-pattern="grid">Grid</button>
-              <button class="pattern-btn" data-pattern="noise">Noise</button>
+          
+          <!-- 4. Notifications Panel -->
+          <div class="settings-panel" id="panel-notifications" style="display: none; flex-direction: column; gap: 16px;">
+            <h3>Notifications Alerts</h3>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <div class="setting-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <label style="text-transform: none; font-size: 13px; font-weight: 500; display:block;">Water hydration alerts</label>
+                  <span style="font-size:11px; color:var(--text-secondary);" id="water-notif-preview">Preview: "Time to drink water! 💧 You have logged 0ml so far."</span>
+                </div>
+                <input type="checkbox" id="notif-toggle-water" checked style="width: 20px; height: 20px; cursor: pointer;" />
+              </div>
+              <div class="setting-row" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <div>
+                  <label style="text-transform: none; font-size: 13px; font-weight: 500; display:block;">Deadline warning alerts</label>
+                  <span style="font-size:11px; color:var(--text-secondary);" id="deadline-notif-preview">Preview: "Task 'Math Study' is due in 2 hours! ⏳"</span>
+                </div>
+                <input type="checkbox" id="notif-toggle-deadline" checked style="width: 20px; height: 20px; cursor: pointer;" />
+              </div>
+              <div class="setting-row" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <div>
+                  <label style="text-transform: none; font-size: 13px; font-weight: 500; display:block;">Habit nudge alerts</label>
+                  <span style="font-size:11px; color:var(--text-secondary);" id="habit-notif-preview">Preview: "Don't forget your habit 'Coding' tonight! 🌿"</span>
+                </div>
+                <input type="checkbox" id="notif-toggle-habit" checked style="width: 20px; height: 20px; cursor: pointer;" />
+              </div>
             </div>
           </div>
-        </div>
-        <div class="settings-panel" id="panel-quotes">
-          <div class="setting-group">
-            <label>My Mantras</label>
-            <div id="mantras-list"></div>
-            <div class="mantra-add-row">
-              <input type="text" id="mantra-input" placeholder="Add your own mantra..." />
-              <button class="btn-primary-sm" id="add-mantra-btn">Add</button>
+          
+          <!-- 5. Data & Privacy Panel -->
+          <div class="settings-panel" id="panel-data-manage" style="display: none; flex-direction: column; gap: 16px;">
+            <h3>Data Management & Privacy</h3>
+            <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Planory stores all your tasks, habits, hydration logs, and notes locally. You can export or clear your database at any time.</p>
+            <div style="display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
+              <button class="btn-primary" id="data-export-btn" style="padding: 10px 16px; font-size: 12px;">📥 Export Data (JSON)</button>
+              <button class="btn-ghost" id="data-clear-btn" style="padding: 10px 16px; font-size: 12px; color: #f87171; border-color: rgba(248,113,113,0.3);">🗑️ Clear History</button>
+              <button class="btn-ghost" id="data-delete-btn" style="padding: 10px 16px; font-size: 12px; color: #f87171; border-color: rgba(248,113,113,0.3);">⚠️ Delete Account</button>
             </div>
           </div>
-        </div>
-        <div class="settings-panel" id="panel-profile">
-          <div class="setting-group">
-            <label>Name</label>
-            <input type="text" id="settings-name" />
-          </div>
-          <div class="setting-group">
-            <label>Bio</label>
-            <input type="text" id="settings-bio" />
-          </div>
-          <div class="setting-group">
-            <label>Avatar</label>
-            <div class="avatar-picker" id="settings-avatar-picker">
-              <span class="avatar-opt" data-avatar="🦁">🦁</span>
-              <span class="avatar-opt" data-avatar="🐯">🐯</span>
-              <span class="avatar-opt" data-avatar="🦊">🦊</span>
-              <span class="avatar-opt" data-avatar="🐺">🐺</span>
-              <span class="avatar-opt" data-avatar="🦅">🦅</span>
-              <span class="avatar-opt" data-avatar="🐉">🐉</span>
-              <span class="avatar-opt" data-avatar="🌙">🌙</span>
-              <span class="avatar-opt" data-avatar="⚡">⚡</span>
-              <span class="avatar-opt" data-avatar="🔥">🔥</span>
-            </div>
-          </div>
-          <button class="btn-primary" id="save-profile-btn">Save Profile</button>
         </div>
       </div>
     </div>
@@ -871,45 +1048,45 @@
   </div>
 
   <!-- Week in Review Modal -->
-  <div class="modal-overlay hidden" id="week-review-overlay" style="z-index: 2000; background: rgba(0,0,0,0.95); backdrop-filter: blur(20px);">
+  <div class="modal-overlay hidden" id="week-review-overlay" style="z-index: 2000; background: rgba(0,0,0,0.92); backdrop-filter: blur(15px);">
     <div style="position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center;">
       <button id="close-week-review-btn" style="position: absolute; top: 30px; right: 40px; color: white; font-size: 40px; cursor: pointer; background: none; border: none;">×</button>
       
-      <div id="week-review-content" style="width: 380px; height: 650px; background: linear-gradient(180deg, #667eea, #764ba2); border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: white; padding: 40px; animation: slideUpBounce 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: relative; overflow: hidden;">
+      <div id="week-review-content" style="width: 380px; height: 600px; background: #0e0e0e; border: 2px solid #BA7517; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; justify-content: space-between; color: white; padding: 40px; position: relative; overflow: hidden;">
         
-        <!-- Animated Background Elements -->
-        <div style="position: absolute; top: -50px; left: -50px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 70%); border-radius: 50%;"></div>
-        <div style="position: absolute; bottom: -80px; right: -50px; width: 250px; height: 250px; background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%); border-radius: 50%;"></div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:4px; width:100%;">
+          <span style="font-size: 20px; font-weight: 800; color: #BA7517; letter-spacing: 2px; font-family: var(--font-display);">PLANORY</span>
+          <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.6;">Weekly Wrapped</span>
+        </div>
         
-        <h3 style="font-family: var(--font-display); font-size: 16px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.8; margin-bottom: 24px;">Your Week Wrapped</h3>
-        
-        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 24px; width: 100%;">
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 20px; width: 100%; margin-top:20px;">
           
-          <div style="background: rgba(255,255,255,0.1); border-radius: 16px; padding: 20px; backdrop-filter: blur(10px);">
-            <div style="font-size: 48px; font-weight: 800; font-family: var(--font-display); margin-bottom: 4px;" id="wr-score">A+</div>
-            <div style="font-size: 14px; opacity: 0.9;">Average Daily Score</div>
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px; text-align:center;">
+            <div style="font-size: 48px; font-weight: 800; font-family: var(--font-display); color:#BA7517; margin-bottom: 4px;" id="wr-score">A+</div>
+            <div style="font-size: 12px; opacity: 0.7; text-transform:uppercase; letter-spacing:1px;">Weekly Grade</div>
           </div>
           
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-            <div style="background: rgba(255,255,255,0.1); border-radius: 16px; padding: 16px; backdrop-filter: blur(10px);">
-              <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;" id="wr-tasks">32</div>
-              <div style="font-size: 12px; opacity: 0.9;">Tasks Done</div>
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 16px; padding: 16px; text-align:center;">
+              <div style="font-size: 24px; font-weight: 800; color:#fff;" id="wr-tasks">32</div>
+              <div style="font-size: 11px; opacity: 0.7; text-transform:uppercase; letter-spacing:1px;">Tasks Done</div>
             </div>
-            <div style="background: rgba(255,255,255,0.1); border-radius: 16px; padding: 16px; backdrop-filter: blur(10px);">
-              <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;" id="wr-focus">12h</div>
-              <div style="font-size: 12px; opacity: 0.9;">Focus Time</div>
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 16px; padding: 16px; text-align:center;">
+              <div style="font-size: 24px; font-weight: 800; color:#fff;" id="wr-focus">12h</div>
+              <div style="font-size: 11px; opacity: 0.7; text-transform:uppercase; letter-spacing:1px;">Focus Time</div>
             </div>
           </div>
           
-          <div style="background: rgba(255,255,255,0.1); border-radius: 16px; padding: 20px; backdrop-filter: blur(10px);">
-            <div style="font-size: 24px; font-weight: 800; margin-bottom: 4px;" id="wr-best-day">Wednesday</div>
-            <div style="font-size: 14px; opacity: 0.9;">Most Productive Day</div>
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 16px; padding: 16px; text-align:center;">
+            <div style="font-size: 20px; font-weight: 800; color:#fff;" id="wr-best-day">Wednesday</div>
+            <div style="font-size: 11px; opacity: 0.7; text-transform:uppercase; letter-spacing:1px;">Best Day</div>
           </div>
           
         </div>
         
-        <div style="margin-top: 32px; font-size: 13px; opacity: 0.7;">
-          Take a screenshot to share!
+        <div style="display:flex; flex-direction:column; align-items:center; gap:12px; width:100%; margin-top:20px;">
+          <button class="btn-primary" id="share-wrapped-btn" style="background:#BA7517; color:#fff; border-radius:12px; font-size:12px; padding:10px 20px; font-weight:700; width:100%; cursor:pointer;">📤 Share Wrapped</button>
+          <span style="font-size: 11px; opacity: 0.5; font-style:italic;" id="wrapped-username">@Tanmay</span>
         </div>
         
       </div>
@@ -953,6 +1130,148 @@
       </div>
     </div>
   </div>
+
+  <!-- MOBILE BOTTOM TABS -->
+  <nav class="mobile-bottom-tabs" id="mobile-bottom-nav">
+    <button class="tab-btn active" id="mobile-tab-weekly" data-tab="weekly">
+      <span class="tab-icon">🏠</span>
+      <span class="tab-label">Home</span>
+    </button>
+    <button class="tab-btn" id="mobile-tab-schedule" data-tab="schedule">
+      <span class="tab-icon">📅</span>
+      <span class="tab-label">Schedule</span>
+    </button>
+    <button class="tab-btn" id="mobile-tab-notes" data-tab="notes">
+      <span class="tab-icon">📝</span>
+      <span class="tab-label">Notes</span>
+    </button>
+    <button class="tab-btn" id="mobile-tab-timer" data-tab="timer">
+      <span class="tab-icon">⏱️</span>
+      <span class="tab-label">Timer</span>
+    </button>
+  </nav>
+
+  <!-- Day Detail Side Panel -->
+  <div id="day-detail-panel" class="day-detail-panel hidden">
+    <div class="day-detail-content" style="background:#1a1a1a; width:380px; height:100%; border-left:1px solid var(--border-color); display:flex; flex-direction:column; position:fixed; right:0; top:0; z-index:1800;">
+      <div class="day-detail-header" style="padding:20px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+        <h2 id="day-detail-title" style="font-size:16px; font-weight:700; color:#fff;">Monday Details</h2>
+        <button class="modal-close" id="day-detail-close-btn" style="font-size:24px;">×</button>
+      </div>
+      <div class="day-detail-body" style="padding:20px; display:flex; flex-direction:column; gap:20px; overflow-y:auto; flex:1;">
+        <!-- Tasks Section -->
+        <div class="detail-section" style="display:flex; flex-direction:column; gap:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 class="section-label" style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.07em; margin:0;">Tasks</h3>
+            <button class="btn-primary-sm" id="panel-add-task-btn" style="padding:4px 8px; border-radius:6px; font-size:11px; background:var(--accent); color:#fff;">+ Add Task</button>
+          </div>
+          <div id="panel-quick-add-wrap" class="hidden">
+            <input type="text" id="panel-quick-add-input" placeholder="What needs to be done? Press Enter" style="width:100%; padding:8px 12px; font-size:12px; background:#111; border:1px solid var(--border-color); border-radius:6px; color:#fff;" />
+          </div>
+          <div id="panel-tasks-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+        
+        <!-- Notes Section -->
+        <div class="detail-section" style="display:flex; flex-direction:column; gap:10px;">
+          <h3 class="section-label" style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.07em; margin:0;">Notes</h3>
+          <div id="panel-notes-list"></div>
+        </div>
+
+        <!-- Pomodoro / Focus Summary -->
+        <div class="detail-section" style="display:flex; flex-direction:column; gap:6px;">
+          <h3 class="section-label" style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.07em; margin:0;">Focus Summary</h3>
+          <div id="panel-focus-summary" style="font-size:13px; color:#fff;">0m focused today</div>
+        </div>
+
+        <!-- Water Log Summary -->
+        <div class="detail-section" style="display:flex; flex-direction:column; gap:6px;">
+          <h3 class="section-label" style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.07em; margin:0;">Water Summary</h3>
+          <div id="panel-water-summary" style="font-size:13px; color:#fff;">0 / 2000 ml drank</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Command Palette Overlay -->
+  <div class="modal-overlay hidden" id="command-palette-overlay" style="z-index:2200; background: rgba(0,0,0,0.6); align-items: flex-start; padding-top: 10vh;">
+    <div class="command-palette-card" style="width: 550px; background: #1a1a1a; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-lg); overflow: hidden; display:flex; flex-direction:column;">
+      <div class="command-palette-search-wrap" style="display:flex; align-items:center; border-bottom: 1px solid var(--border-color); padding: 12px 16px;">
+        <span style="font-size:18px; margin-right:12px; color:var(--text-secondary);">🔍</span>
+        <input type="text" id="command-palette-input" placeholder="Type a command or search..." style="flex:1; background:none; border:none; color:#fff; font-size:15px; outline:none;" autocomplete="off" />
+        <kbd style="background:rgba(255,255,255,0.08); font-size:10px; padding:3px 6px; border-radius:4px; color:var(--text-secondary);">ESC</kbd>
+      </div>
+      <div id="command-palette-results" style="max-height: 350px; overflow-y:auto; padding: 8px 0;">
+        <!-- Filled dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Shortcuts Cheat Sheet Modal -->
+  <div class="modal-overlay hidden" id="shortcuts-modal-overlay" style="z-index:2100;">
+    <div class="modal" style="max-width: 450px;">
+      <div class="modal-header">
+        <h2 style="font-size:16px;">Keyboard Shortcuts</h2>
+        <button class="modal-close" id="shortcuts-close-btn">×</button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:12px; padding: 20px;">
+        <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
+          <span style="font-weight:600; font-size:12px; color:#fff;">Global</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-primary);">
+          <span>Open Command Palette</span><kbd style="background:rgba(255,255,255,0.08); padding:3px 6px; border-radius:4px; font-size:10px; color:#fff;">Ctrl + K</kbd>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-primary);">
+          <span>New Note</span><kbd style="background:rgba(255,255,255,0.08); padding:3px 6px; border-radius:4px; font-size:10px; color:#fff;">Ctrl + N</kbd>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-primary);">
+          <span>Start Pomodoro Timer</span><kbd style="background:rgba(255,255,255,0.08); padding:3px 6px; border-radius:4px; font-size:10px; color:#fff;">Ctrl + T</kbd>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-primary);">
+          <span>Show Shortcuts Sheet</span><kbd style="background:rgba(255,255,255,0.08); padding:3px 6px; border-radius:4px; font-size:10px; color:#fff;">Ctrl + /</kbd>
+        </div>
+        
+        <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border-color); padding-bottom:8px; margin-top:8px;">
+          <span style="font-weight:600; font-size:12px; color:#fff;">Navigation</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-primary);">
+          <span>Switch View / Page (1-5)</span><kbd style="background:rgba(255,255,255,0.08); padding:3px 6px; border-radius:4px; font-size:10px; color:#fff;">1 - 5</kbd>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--text-primary);">
+          <span>Close Modal / Drawer</span><kbd style="background:rgba(255,255,255,0.08); padding:3px 6px; border-radius:4px; font-size:10px; color:#fff;">Esc</kbd>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slash Command Block Insertion Menu -->
+  <div id="slash-menu" class="slash-menu hidden" style="z-index: 3000; background:#1a1a1a; border:1px solid var(--border-color); border-radius:8px; width:220px; box-shadow:var(--shadow-lg); overflow:hidden; position:fixed;">
+    <div class="slash-item" data-block="h1" style="display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:pointer;">
+      <span style="font-size:14px; font-weight:700; color:#fff;">H1</span> <span style="font-size:11px; color:var(--text-secondary);">Heading 1</span>
+    </div>
+    <div class="slash-item" data-block="h2" style="display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:pointer;">
+      <span style="font-size:14px; font-weight:700; color:#fff;">H2</span> <span style="font-size:11px; color:var(--text-secondary);">Heading 2</span>
+    </div>
+    <div class="slash-item" data-block="ul" style="display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:pointer;">
+      <span style="font-size:14px; font-weight:700; color:#fff;">•</span> <span style="font-size:11px; color:var(--text-secondary);">Bullet list</span>
+    </div>
+    <div class="slash-item" data-block="code" style="display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:pointer;">
+      <span style="font-size:14px; font-weight:700; color:#fff;">&lt;&gt;</span> <span style="font-size:11px; color:var(--text-secondary);">Code block</span>
+    </div>
+    <div class="slash-item" data-block="divider" style="display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:pointer;">
+      <span style="font-size:14px; font-weight:700; color:#fff;">—</span> <span style="font-size:11px; color:var(--text-secondary);">Divider line</span>
+    </div>
+  </div>
+
+  <!-- Inline Formatting Popup Toolbar -->
+  <div id="inline-toolbar" class="inline-toolbar hidden" style="z-index: 3100; background:#1a1a1a; border:1px solid var(--border-color); border-radius:6px; box-shadow:var(--shadow-md); padding:4px; display:flex; gap:4px; position:fixed; align-items:center;">
+    <button class="inline-btn" data-cmd="bold" style="padding:4px 8px; font-size:11px; font-weight:700; color:#fff; border:none; background:none;">B</button>
+    <button class="inline-btn" data-cmd="italic" style="padding:4px 8px; font-size:11px; font-style:italic; color:#fff; border:none; background:none;">I</button>
+    <button class="inline-btn" data-cmd="code" style="padding:4px 8px; font-size:11px; font-family:monospace; color:#fff; border:none; background:none;">&lt;&gt;</button>
+    <button class="inline-btn" id="inline-link-btn" style="padding:4px 8px; font-size:11px; color:#fff; border:none; background:none;">🔗</button>
+  </div>
+
+  <!-- Autocomplete mentions menu -->
+  <div id="mention-menu" class="mention-menu hidden" style="z-index: 3200; background:#1a1a1a; border:1px solid var(--border-color); border-radius:8px; width:220px; box-shadow:var(--shadow-lg); overflow-y:auto; max-height:160px; position:fixed;"></div>
 
   <script type="module" src="/src/main.js"></script>
 </body>

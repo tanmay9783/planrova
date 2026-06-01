@@ -205,7 +205,7 @@ export default function WindDownModal({
           key={i} 
           name={i <= ratingOutOfFive ? "star" : "star-outline"} 
           size={12} 
-          color={i <= ratingOutOfFive ? "#C2A878" : "#5A6070"} 
+          color={i <= ratingOutOfFive ? "#BA7517" : "#5A6070"} 
           style={{ marginLeft: 2 }}
         />
       );
@@ -249,12 +249,12 @@ export default function WindDownModal({
           {/* STEP 1: Rate Productivity */}
           {step === 1 && (
             <View style={styles.stepContainer}>
-              <Ionicons name="sparkles-outline" size={48} color="#C2A878" style={{ marginBottom: 16 }} />
+              <Ionicons name="sparkles-outline" size={48} color="#BA7517" style={{ marginBottom: 16 }} />
               <Text style={styles.title}>Reflect on Today</Text>
               <Text style={styles.subtitle}>How productive did you feel your study sessions were today?</Text>
 
               {isSavingRating ? (
-                <ActivityIndicator color="#C2A878" size="large" style={{ marginVertical: 32 }} />
+                <ActivityIndicator color="#BA7517" size="large" style={{ marginVertical: 32 }} />
               ) : (
                 <View style={styles.ratingList}>
                   {[
@@ -281,7 +281,7 @@ export default function WindDownModal({
           {/* STEP 2: Carry-over Tasks */}
           {step === 2 && (
             <View style={styles.stepContainer}>
-              <Ionicons name="arrow-forward-circle-outline" size={48} color="#C2A878" style={{ marginBottom: 16 }} />
+              <Ionicons name="arrow-forward-circle-outline" size={48} color="#BA7517" style={{ marginBottom: 16 }} />
               <Text style={styles.title}>Incomplete Backlog</Text>
               <Text style={styles.subtitle}>
                 You have {incompleteTodayTasks.length} uncompleted tasks remaining from today.
@@ -304,7 +304,7 @@ export default function WindDownModal({
               </ScrollView>
 
               {isCarryingOver ? (
-                <ActivityIndicator color="#C2A878" size="small" style={{ marginTop: 24 }} />
+                <ActivityIndicator color="#BA7517" size="small" style={{ marginTop: 24 }} />
               ) : (
                 <View style={styles.actionRow}>
                   {incompleteTodayTasks.length > 0 && (
@@ -332,7 +332,7 @@ export default function WindDownModal({
           {/* STEP 3: Report Card */}
           {step === 3 && (
             <View style={styles.stepContainer}>
-              <Ionicons name="receipt-outline" size={48} color="#C2A878" style={{ alignSelf: 'center', marginBottom: 16 }} />
+              <Ionicons name="receipt-outline" size={48} color="#BA7517" style={{ alignSelf: 'center', marginBottom: 16 }} />
               <Text style={[styles.title, { textAlign: 'center' }]}>Today's Report Card</Text>
               <Text style={[styles.subtitle, { textAlign: 'center', marginBottom: 16 }]}>
                 {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -396,7 +396,7 @@ export default function WindDownModal({
           {/* STEP 4: Tomorrow Preview */}
           {step === 4 && (
             <View style={styles.stepContainer}>
-              <Ionicons name="eye-outline" size={48} color="#C2A878" style={{ marginBottom: 16 }} />
+              <Ionicons name="eye-outline" size={48} color="#BA7517" style={{ marginBottom: 16 }} />
               <Text style={styles.title}>Tomorrow's Preview</Text>
               <Text style={styles.subtitle}>Here is how your desk looks for tomorrow morning:</Text>
 
@@ -404,7 +404,7 @@ export default function WindDownModal({
                 <Text style={styles.previewHeading}>TIMETABLE FIRST CLASS</Text>
                 {firstClass ? (
                   <View style={styles.classCard}>
-                    <Ionicons name="school" size={20} color="#C2A878" style={{ marginRight: 12 }} />
+                    <Ionicons name="school" size={20} color="#BA7517" style={{ marginRight: 12 }} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.classSubject}>{firstClass.subject}</Text>
                       <Text style={styles.classDetail}>{firstClass.time} • {firstClass.room || 'No Room'}</Text>
@@ -424,7 +424,7 @@ export default function WindDownModal({
                   ) : (
                     tomorrowTasks.map(t => (
                       <View key={t.id} style={styles.taskPreviewItem}>
-                        <Ionicons name="arrow-forward" size={12} color="#C2A878" style={{ marginRight: 8 }} />
+                        <Ionicons name="arrow-forward" size={12} color="#BA7517" style={{ marginRight: 8 }} />
                         <Text style={styles.taskPreviewText} numberOfLines={1}>{t.title}</Text>
                       </View>
                     ))
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
     borderRadius: 2
   },
   progressStepActive: {
-    backgroundColor: '#C2A878'
+    backgroundColor: '#BA7517'
   },
   stepContainer: {
     flex: 1,
@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
     gap: 12
   },
   primaryBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 14,
     padding: 16,
     alignItems: 'center',
@@ -719,7 +719,7 @@ const styles = StyleSheet.create({
   scoreValText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 20,
-    color: '#C2A878'
+    color: '#BA7517'
   },
   scoreComment: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
@@ -730,7 +730,7 @@ const styles = StyleSheet.create({
   xpEarnedText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 12,
-    color: '#C2A878',
+    color: '#BA7517',
     marginTop: 4
   }
 });

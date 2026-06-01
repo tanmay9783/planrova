@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ScrollView, Modal, ActivityIndicator, Platform, StatusBar, Alert, Vibration, Linking, RefreshControl, Animated, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFirestoreData } from '../hooks/useFirestoreData';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../firebase';
+import { useRoute } from '@react-navigation/native';
 import { calculateXPProgress } from '../utils/gamification';
 import { callOcrProxy } from '../config/api';
 
@@ -31,6 +32,29 @@ export default function NotesScreen() {
   const [notes, setNotes] = useFirestoreData('notes', []);
   const [brainDump, setBrainDump] = useFirestoreData('brain_dump', []);
   const [gamification, setGamification] = useFirestoreData('gamification', { level: 1, xp: 0 });
+
+  const subjectInputRef = useRef(null);
+  const route = useRoute();
+
+  const cleanNoteTextForPreview = (text) => {
+    if (!text) return '';
+    let cleaned = text;
+    cleaned = cleaned.replace(/---/g, '');
+    cleaned = cleaned.replace(/\[OCR SCAN:[^\]]*\]/gi, '');
+    cleaned = cleaned.replace(/#+\s*/g, '');
+    cleaned = cleaned.replace(/\*\*|__|\*|_|`|~/g, '');
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    return cleaned;
+  };
+
+  useEffect(() => {
+    if (route.params?.action === 'new_note') {
+      setViewMode('notes');
+      setTimeout(() => {
+        subjectInputRef.current?.focus();
+      }, 300);
+    }
+  }, [route.params]);
 
   // Flashcards state
   const [flashcards, setFlashcards] = useFirestoreData('flashcards', []);
@@ -238,7 +262,8 @@ export default function NotesScreen() {
       Alert.alert('Required Field', 'Note content cannot be empty.');
       return;
     }
-    const autoTitle = viewNoteText.trim().split('\n')[0].substring(0, 40).trim() || 'Untitled Note';
+    const cleanContent = cleanNoteTextForPreview(viewNoteText);
+    const autoTitle = cleanContent.substring(0, 40).trim() || 'Untitled Note';
     const updatedNotes = notes.map(n => 
       n.id === selectedNoteForView.id 
         ? { 
@@ -321,7 +346,8 @@ export default function NotesScreen() {
 
   const addNote = () => {
     if (!newContent.trim()) return;
-    const autoTitle = newContent.trim().split('\n')[0].substring(0, 40).trim() || 'Untitled Note';
+    const cleanContent = cleanNoteTextForPreview(newContent);
+    const autoTitle = cleanContent.substring(0, 40).trim() || 'Untitled Note';
     setNotes([
       { 
         id: Date.now().toString(), 
@@ -524,8 +550,8 @@ export default function NotesScreen() {
               <RefreshControl 
                 refreshing={refreshing} 
                 onRefresh={onRefresh} 
-                colors={['#C2A878']} 
-                tintColor="#C2A878" 
+                colors={['#BA7517']} 
+                tintColor="#BA7517" 
               />
             }
             data={sortedNotes}
@@ -550,6 +576,7 @@ export default function NotesScreen() {
 
                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
                   <TextInput
+                    ref={subjectInputRef}
                     style={[styles.input, { flex: 1, paddingVertical: 12 }]}
                     placeholder="Subject (e.g. Maths)"
                     placeholderTextColor="#5A6070"
@@ -579,9 +606,9 @@ export default function NotesScreen() {
                   <TouchableOpacity onPress={() => insertMarkdown('list')} style={styles.toolbarBtn}>
                     <Text style={styles.toolbarBtnTextList}>• List</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setShowScannerModal(true)} style={[styles.toolbarBtn, { marginLeft: 'auto', backgroundColor: 'rgba(194, 168, 120, 0.15)' }]}>
-                    <Ionicons name="camera-outline" size={14} color="#C2A878" />
-                    <Text style={[styles.toolbarBtnTextCode, { color: '#C2A878', marginLeft: 4 }]}>Scan Whiteboard</Text>
+                  <TouchableOpacity onPress={() => setShowScannerModal(true)} style={[styles.toolbarBtn, { marginLeft: 'auto', backgroundColor: 'rgba(186, 117, 23, 0.15)' }]}>
+                    <Ionicons name="camera-outline" size={14} color="#BA7517" />
+                    <Text style={[styles.toolbarBtnTextCode, { color: '#BA7517', marginLeft: 4 }]}>Scan Whiteboard</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -602,7 +629,7 @@ export default function NotesScreen() {
                       style={[
                         styles.colorDot,
                         { backgroundColor: c.value },
-                        selectedColor === c.value && { borderWidth: 2, borderColor: '#C2A878' }
+                        selectedColor === c.value && { borderWidth: 2, borderColor: '#BA7517' }
                       ]}
                       onPress={() => setSelectedColor(c.value)}
                     />
@@ -631,14 +658,14 @@ export default function NotesScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 }}>
                     <Text style={styles.dateLarge}>{new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
                     <TouchableOpacity onPress={() => handleOpenCreateCardModal(item)} style={{ padding: 4 }}>
-                      <Ionicons name="card-outline" size={16} color="#C2A878" />
+                      <Ionicons name="card-outline" size={16} color="#BA7517" />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => togglePinNote(item.id)} style={{ padding: 4 }}>
-                      <Ionicons name={item.pinned ? "pin" : "pin-outline"} size={16} color={item.pinned ? "#C2A878" : "#5A6070"} />
+                      <Ionicons name={item.pinned ? "pin" : "pin-outline"} size={16} color={item.pinned ? "#BA7517" : "#5A6070"} />
                     </TouchableOpacity>
                   </View>
                 </View>
-                <Text style={styles.text} numberOfLines={2} ellipsizeMode="tail">{item.text}</Text>
+                <Text style={styles.text} numberOfLines={2} ellipsizeMode="tail">{cleanNoteTextForPreview(item.text)}</Text>
               </TouchableOpacity>
             )}
             ListEmptyComponent={() => (
@@ -665,8 +692,8 @@ export default function NotesScreen() {
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh} 
-              colors={['#C2A878']} 
-              tintColor="#C2A878" 
+              colors={['#BA7517']} 
+              tintColor="#BA7517" 
             />
           }
         >
@@ -712,7 +739,7 @@ export default function NotesScreen() {
              <View style={styles.scannerBox}>
               {isScanning ? (
                 <View style={{ alignItems: 'center' }}>
-                  <ActivityIndicator size="large" color="#C2A878" />
+                  <ActivityIndicator size="large" color="#BA7517" />
                   <Text style={styles.scannerStepText}>
                     {scanStep === 1 ? 'Reading document margins...' : 'Extracting handwritten text...'}
                   </Text>
@@ -728,7 +755,7 @@ export default function NotesScreen() {
                        : "Could not read image. Try again?"}
                    </Text>
                   <TouchableOpacity
-                    style={[styles.modalActionBtn, { backgroundColor: '#C2A878', width: 200 }]}
+                    style={[styles.modalActionBtn, { backgroundColor: '#BA7517', width: 200 }]}
                     onPress={() => runWhiteboardOcr(lastBase64)}
                   >
                     <Text style={[styles.modalActionBtnText, { color: '#0F1115' }]}>Retry Scan</Text>
@@ -745,9 +772,9 @@ export default function NotesScreen() {
                 </View>
               ) : (
                 <View style={{ alignItems: 'center', gap: 12, width: '100%' }}>
-                  <Ionicons name="camera-outline" size={48} color="#C2A878" />
+                  <Ionicons name="camera-outline" size={48} color="#BA7517" />
                   <TouchableOpacity
-                    style={[styles.modalActionBtn, { backgroundColor: '#C2A878', width: 200 }]}
+                    style={[styles.modalActionBtn, { backgroundColor: '#BA7517', width: 200 }]}
                     onPress={() => handleLaunchWhiteboardOcr(true)}
                   >
                     <Text style={[styles.modalActionBtnText, { color: '#0F1115' }]}>Snap Whiteboard</Text>
@@ -830,7 +857,7 @@ export default function NotesScreen() {
                      <Text style={[styles.modalActionBtnText, { color: '#8B92A0' }]}>Cancel</Text>
                    </TouchableOpacity>
                    <TouchableOpacity 
-                     style={[styles.modalActionBtn, { flex: 1, backgroundColor: '#C2A878' }]} 
+                     style={[styles.modalActionBtn, { flex: 1, backgroundColor: '#BA7517' }]} 
                      onPress={handleCreateFlashcard}
                    >
                      <Text style={[styles.modalActionBtnText, { color: '#0F1115' }]}>Create Card</Text>
@@ -901,15 +928,15 @@ export default function NotesScreen() {
                    </TouchableOpacity>
  
                    <TouchableOpacity 
-                     style={[styles.modalActionBtn, { flex: 1.2, backgroundColor: 'rgba(194, 168, 120, 0.15)', borderWidth: 1, borderColor: '#C2A878', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} 
+                     style={[styles.modalActionBtn, { flex: 1.2, backgroundColor: 'rgba(186, 117, 23, 0.15)', borderWidth: 1, borderColor: '#BA7517', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} 
                      onPress={handleMakeFlashcardFromViewer}
                    >
-                     <Ionicons name="card-outline" size={15} color="#C2A878" />
-                     <Text style={[styles.modalActionBtnText, { color: '#C2A878', fontSize: 12 }]}>Card</Text>
+                     <Ionicons name="card-outline" size={15} color="#BA7517" />
+                     <Text style={[styles.modalActionBtnText, { color: '#BA7517', fontSize: 12 }]}>Card</Text>
                    </TouchableOpacity>
  
                    <TouchableOpacity 
-                     style={[styles.modalActionBtn, { flex: 1.5, backgroundColor: '#C2A878', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} 
+                     style={[styles.modalActionBtn, { flex: 1.5, backgroundColor: '#BA7517', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]} 
                      onPress={handleSaveViewedNote}
                    >
                      <Ionicons name="checkmark" size={15} color="#0F1115" />
@@ -951,7 +978,7 @@ export default function NotesScreen() {
                 >
                   {/* Front Side */}
                   <Animated.View style={[styles.flipCardFront, frontAnimatedStyle]}>
-                    <Ionicons name="help-circle-outline" size={32} color="#C2A878" style={{ marginBottom: 12 }} />
+                    <Ionicons name="help-circle-outline" size={32} color="#BA7517" style={{ marginBottom: 12 }} />
                     <Text style={styles.flipTextFront}>
                       {reviewList[currentReviewIdx].front}
                     </Text>
@@ -1081,8 +1108,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.05)',
   },
   subjectPillActive: {
-    backgroundColor: '#C2A878',
-    borderColor: '#C2A878',
+    backgroundColor: '#BA7517',
+    borderColor: '#BA7517',
   },
   subjectPillText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
@@ -1141,7 +1168,7 @@ const styles = StyleSheet.create({
     color: '#F3F1EC',
   },
   btn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
@@ -1161,7 +1188,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.03)',
   },
   subjectBadge: {
-    backgroundColor: 'rgba(194, 168, 120, 0.12)',
+    backgroundColor: 'rgba(186, 117, 23, 0.12)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -1169,7 +1196,7 @@ const styles = StyleSheet.create({
   subjectPrimaryHeader: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 12,
-    color: '#C2A878',
+    color: '#BA7517',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
     marginBottom: 4
@@ -1177,7 +1204,7 @@ const styles = StyleSheet.create({
   subjectText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 10,
-    color: '#C2A878',
+    color: '#BA7517',
     letterSpacing: 0.5,
   },
   date: {
@@ -1285,7 +1312,7 @@ const styles = StyleSheet.create({
     lineHeight: 18
   },
   emptyStateBtn: {
-    backgroundColor: 'rgba(194, 168, 120, 0.12)',
+    backgroundColor: 'rgba(186, 117, 23, 0.12)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 10,
@@ -1294,13 +1321,13 @@ const styles = StyleSheet.create({
   emptyStateBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 11,
-    color: '#C2A878'
+    color: '#BA7517'
   },
   reviewBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 14,
     padding: 14,
     marginHorizontal: 24,
@@ -1324,7 +1351,7 @@ const styles = StyleSheet.create({
   refNoteLabel: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 10,
-    color: '#C2A878',
+    color: '#BA7517',
     textTransform: 'uppercase',
     marginBottom: 4,
   },
@@ -1347,7 +1374,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E2430',
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: '#C2A878',
+    borderColor: '#BA7517',
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',

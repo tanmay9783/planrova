@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, TextInput, Modal, Platform, StatusBar, Animated, Dimensions, Vibration, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, TextInput, Modal, Platform, StatusBar, Animated, Dimensions, Vibration, RefreshControl, Easing, Image } from 'react-native';
 import { useFirestoreData } from '../hooks/useFirestoreData';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../firebase';
@@ -9,17 +9,110 @@ import ConfettiBurst from '../components/ConfettiBurst';
 import XPFlyAnimation from '../components/XPFlyAnimation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { scheduleWaterReminders, cancelReminders, requestNotificationPermission } from '../utils/notifications';
+import { LinearGradient } from 'expo-linear-gradient';
 
 
 const DRINK_TYPES = [
   { name: 'Water', desc: 'Pure hydration', amount: 250, factor: 1.0, color: '#4B6BFB', icon: 'water-outline' },
   { name: 'Nariyal paani', desc: 'Electrolytes +', amount: 250, factor: 1.0, color: '#7C9B7A', icon: 'leaf-outline' },
-  { name: 'Nimbu paani', desc: 'Vitamin C boost', amount: 250, factor: 1.0, color: '#C2A878', icon: 'sunny-outline' },
+  { name: 'Nimbu paani', desc: 'Vitamin C boost', amount: 250, factor: 1.0, color: '#BA7517', icon: 'sunny-outline' },
   { name: 'Cutting chai', desc: 'Diuretic (-30 ml)', amount: -30, factor: 1.0, color: '#C47070', icon: 'cafe-outline' }
 ];
 
+const WaveOverlay = () => {
+  const waveAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(waveAnim, {
+          toValue: 1,
+          duration: 2500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(waveAnim, {
+          toValue: 0,
+          duration: 2500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        })
+      ])
+    ).start();
+  }, []);
+
+  const translateX = waveAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-25, 5]
+  });
+
+  const rotate = waveAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['-1.5deg', '1.5deg']
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.waveOverlay,
+        {
+          transform: [{ translateX }, { rotate }],
+        }
+      ]}
+    />
+  );
+};
+
+const Bubble = ({ delay }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+  const left = useRef(Math.random() * 110 + 20).current;
+  const size = useRef(Math.random() * 4 + 3).current;
+
+  useEffect(() => {
+    const startAnim = () => {
+      anim.setValue(0);
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 3000 + Math.random() * 1500,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ]).start(() => startAnim());
+    };
+    startAnim();
+  }, []);
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [230, 10]
+  });
+
+  const opacity = anim.interpolate({
+    inputRange: [0, 0.1, 0.8, 1],
+    outputRange: [0, 0.6, 0.6, 0]
+  });
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        left,
+        transform: [{ translateY }],
+        opacity,
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: 'rgba(255, 255, 255, 0.35)',
+      }}
+    />
+  );
+};
+
 export default function HydrationScreen() {
   const userId = auth.currentUser ? auth.currentUser.uid : 'guest';
+  const hydrationCheckedRef = useRef(false);
   const [hydration, setHydration] = useFirestoreData('hydration', { water: 0, target: 2000 });
   const [logs, setLogs] = useFirestoreData('hydration_logs', []);
   const [gamification, setGamification] = useFirestoreData('gamification', { level: 1, xp: 0 });
@@ -50,19 +143,32 @@ export default function HydrationScreen() {
   const [challengeTimer, setChallengeTimer] = useState(60);
   const [challengeWon, setChallengeWon] = useState(false);
 
-  // Daily midnight reset — resets hydration water count each new day
+  // Daily midnight reset & target validation
   useEffect(() => {
-    const checkAndResetDaily = async () => {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const lastResetDate = await AsyncStorage.getItem(`hydration_reset_date_${userId}`);
-      if (lastResetDate !== todayStr) {
-        // It's a new day — reset the water counter
-        setHydration(prev => ({ ...prev, water: 0 }));
-        await AsyncStorage.setItem(`hydration_reset_date_${userId}`, todayStr);
-      }
-    };
-    checkAndResetDaily();
-  }, []);
+    if (hydration && !hydrationCheckedRef.current) {
+      hydrationCheckedRef.current = true;
+      const checkAndResetDaily = async () => {
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const lastResetDate = await AsyncStorage.getItem(`hydration_reset_date_${userId}`);
+        
+        let currentTargetVal = hydration.target;
+        let shouldReset = false;
+        
+        if (!currentTargetVal || currentTargetVal < 100) {
+          currentTargetVal = 2000;
+          shouldReset = true;
+        }
+        
+        if (lastResetDate !== todayStr) {
+          setHydration({ water: 0, target: currentTargetVal });
+          await AsyncStorage.setItem(`hydration_reset_date_${userId}`, todayStr);
+        } else if (shouldReset) {
+          setHydration({ ...hydration, target: currentTargetVal });
+        }
+      };
+      checkAndResetDaily();
+    }
+  }, [hydration]);
 
   // Handle Challenge Timer
   useEffect(() => {
@@ -136,6 +242,15 @@ export default function HydrationScreen() {
     ]).start();
     setCustomGoalInput(baseTarget.toString());
   }, []);
+
+  useEffect(() => {
+    Animated.timing(fillAnim, {
+      toValue: progress,
+      duration: 1000,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: false
+    }).start();
+  }, [progress]);
 
   const fillHeight = fillAnim.interpolate({
     inputRange: [0, 100],
@@ -223,14 +338,19 @@ export default function HydrationScreen() {
         style={[
           styles.quickDrinkCard,
           { borderColor: isSelected ? drink.color : 'rgba(255,255,255,0.08)' },
-          isSelected && { backgroundColor: `${drink.color}0D` }
+          isSelected && { backgroundColor: `${drink.color}15` }
         ]}
         onPress={() => handleSelectDrink(idx)}
       >
+        {isSelected && (
+          <View style={[styles.cardSelectBadge, { backgroundColor: drink.color }]}>
+            <Ionicons name="checkmark" size={10} color="#0F1115" />
+          </View>
+        )}
         <Animated.View style={{ transform: [{ scale: scaleAnims[idx] }], flex: 1, justifyContent: 'space-between' }}>
           <View style={styles.drinkTopRow}>
             <View style={[styles.drinkIconContainer, { backgroundColor: `${drink.color}18` }]}>
-              <Ionicons name={drink.icon} size={18} color={drink.color} />
+              <Ionicons name={drink.icon} size={22} color={drink.color} />
             </View>
             <View style={styles.drinkTextColumn}>
               <Text style={styles.drinkName}>{drink.name}</Text>
@@ -329,8 +449,8 @@ export default function HydrationScreen() {
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh} 
-              colors={['#C2A878']} 
-              tintColor="#C2A878" 
+              colors={['#BA7517']} 
+              tintColor="#BA7517" 
             />
           }
         >
@@ -339,30 +459,58 @@ export default function HydrationScreen() {
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Water log</Text>
             <TouchableOpacity style={styles.settingsBtn} onPress={() => { setGoalError(''); setCustomGoalInput(baseTarget.toString()); setShowSettingsModal(true); }}>
-              <Ionicons name="settings-sharp" size={16} color="#C2A878" />
+              <Ionicons name="settings-sharp" size={16} color="#BA7517" />
               <Text style={styles.settingsBtnText}>Settings</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Progress Card */}
-          <View style={styles.progressCard}>
-            <View style={styles.radialContainer}>
-              <Animated.View style={[styles.fluidFill, { height: fillHeight }]} />
-              <View style={styles.radialTextContainer}>
-                <Text style={styles.radialPercentText}>{Math.round(progress)}%</Text>
+          {/* Progress Card (Capsule Glass) */}
+          <View style={styles.capsuleWrapper}>
+            <View style={styles.capsuleContainer}>
+              {/* Animated Liquid Fill */}
+              <Animated.View style={[styles.fluidFill, { height: fillHeight }]}>
+                <LinearGradient
+                  colors={['#BA7517', '#4B6BFB', '#102A43']}
+                  style={{ flex: 1 }}
+                />
+                <WaveOverlay />
+                <Bubble delay={0} />
+                <Bubble delay={500} />
+                <Bubble delay={1000} />
+                <Bubble delay={1500} />
+                <Bubble delay={2000} />
+              </Animated.View>
+
+              {/* Exact Glass Cup Image Overlay */}
+              <Image 
+                source={require('../../assets/glass_cup.png')} 
+                style={styles.glassCupImage} 
+                resizeMode="cover"
+              />
+
+              {/* Centered overlays */}
+              <View style={styles.capsuleOverlay}>
+                <Text style={styles.capsuleVolumeText}>{hydration.water} ml</Text>
+                <Text style={styles.capsuleGoalText}>/ {currentTarget} ml</Text>
               </View>
             </View>
+          </View>
 
-            <View style={styles.statsTextColumn}>
-              <Text style={styles.waterVolumeText}>
-                {hydration.water} <Text style={styles.waterVolumeSub}>/ {currentTarget} ml</Text>
+          {/* Progress Details & Bar below Glass */}
+          <View style={styles.belowGlassProgressContainer}>
+            <View style={styles.progressTextRow}>
+              <Text style={styles.progressPercentageText}>{Math.round(progress)}% Complete</Text>
+              <Text style={styles.progressRemainingText}>
+                {remainingWater > 0 ? `${remainingWater} ml left` : 'Daily Goal Achieved! 🌟'}
               </Text>
-              <Text style={styles.dailyGoalLabel}>Daily goal: {currentTarget} ml</Text>
-              <View style={styles.remainingBadge}>
-                <Text style={styles.remainingBadgeText}>
-                  {remainingWater > 0 ? `${remainingWater} ml remaining` : 'Goal Completed! 🌟'}
-                </Text>
-              </View>
+            </View>
+            <View style={styles.progressBarTrack}>
+              <LinearGradient
+                colors={['#BA7517', '#4B6BFB']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.progressBarFill, { width: `${progress}%` }]}
+              />
             </View>
           </View>
 
@@ -428,15 +576,10 @@ export default function HydrationScreen() {
           <Text style={styles.sectionTitle}>TODAY'S TIMELINE</Text>
           <View style={styles.timelineCard}>
             {logs.length === 0 ? (
-              <View style={styles.timelineItem}>
-                <View style={styles.timelineLeftColumn}>
-                  <Text style={styles.timelineTimeText}>12:30 pm</Text>
-                  <View style={[styles.timelineNode, { backgroundColor: '#5A6070' }]} />
-                </View>
-                <View style={styles.timelineRightCard}>
-                  <Text style={styles.timelineTitleText}>Next reminder</Text>
-                  <Text style={styles.timelineSubText}>Hydration schedule active</Text>
-                </View>
+              <View style={styles.emptyTimelineCard}>
+                <Ionicons name="water-outline" size={32} color="#5A6070" style={{ marginBottom: 6 }} />
+                <Text style={styles.emptyTimelineText}>No water logged today yet</Text>
+                <Text style={styles.emptyTimelineSub}>Log a drink above to start your hydration timeline.</Text>
               </View>
             ) : (
               <View>
@@ -494,7 +637,7 @@ export default function HydrationScreen() {
                 </View>
                 <Text style={styles.challengeDescText}>Gained +15 XP bonus. Keep hydrating!</Text>
                 <TouchableOpacity style={[styles.challengeActionBtn, { backgroundColor: '#1D2430' }]} onPress={startChallenge}>
-                  <Text style={[styles.challengeActionBtnText, { color: '#C2A878' }]}>Start Challenge Again</Text>
+                  <Text style={[styles.challengeActionBtnText, { color: '#BA7517' }]}>Start Challenge Again</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -519,8 +662,8 @@ export default function HydrationScreen() {
               <Switch 
                 value={isIndianSummer} 
                 onValueChange={setIsIndianSummer}
-                trackColor={{ false: '#171B22', true: 'rgba(194, 168, 120, 0.4)' }}
-                thumbColor={isIndianSummer ? '#C2A878' : '#8B92A0'}
+                trackColor={{ false: '#171B22', true: 'rgba(186, 117, 23, 0.4)' }}
+                thumbColor={isIndianSummer ? '#BA7517' : '#8B92A0'}
               />
             </View>
 
@@ -532,8 +675,8 @@ export default function HydrationScreen() {
               <Switch 
                 value={alertsEnabled} 
                 onValueChange={handleAlertsToggle}
-                trackColor={{ false: '#171B22', true: 'rgba(194, 168, 120, 0.4)' }}
-                thumbColor={alertsEnabled ? '#C2A878' : '#8B92A0'}
+                trackColor={{ false: '#171B22', true: 'rgba(186, 117, 23, 0.4)' }}
+                thumbColor={alertsEnabled ? '#BA7517' : '#8B92A0'}
               />
             </View>
           </View>
@@ -589,7 +732,7 @@ export default function HydrationScreen() {
                 <Text style={[styles.modalActionBtnText, { color: '#8B92A0' }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.modalActionBtn, { backgroundColor: '#C2A878' }]} 
+                style={[styles.modalActionBtn, { backgroundColor: '#BA7517' }]} 
                 onPress={() => {
                   const goal = parseInt(customGoalInput);
                   if (isNaN(goal) || goal < 500 || goal > 5000) {
@@ -639,80 +782,84 @@ const styles = StyleSheet.create({
   settingsBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 12,
-    color: '#C2A878',
+    color: '#BA7517',
     marginLeft: 6
   },
-  progressCard: {
-    backgroundColor: '#171B22',
-    borderRadius: 20,
-    padding: 20,
-    flexDirection: 'row',
+  capsuleWrapper: {
     alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.03)',
+    justifyContent: 'center',
+    marginVertical: 20,
   },
-  radialContainer: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: '#0F1115',
-    borderWidth: 2.5,
-    borderColor: 'rgba(255,255,255,0.04)',
+  capsuleContainer: {
+    width: 180,
+    height: 320,
+    borderRadius: 90,
+    borderWidth: 2,
+    borderColor: '#BA7517',
+    backgroundColor: '#171B22',
     overflow: 'hidden',
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
-    marginRight: 20
+  },
+  glassCupImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: 180,
+    height: 320,
+    opacity: 0.85,
   },
   fluidFill: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(75, 107, 251, 0.25)',
   },
-  radialTextContainer: {
+  capsuleOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 20,
   },
-  radialPercentText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 24,
-    color: '#4B6BFB'
-  },
-  statsTextColumn: {
-    flex: 1,
-    justifyContent: 'center'
-  },
-  waterVolumeText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 24,
-    color: '#F3F1EC'
-  },
-  waterVolumeSub: {
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 14,
-    color: '#5A6070'
-  },
-  dailyGoalLabel: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 12,
-    color: '#8B92A0',
-    marginTop: 2,
-    marginBottom: 8
-  },
-  remainingBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(124, 155, 122, 0.12)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6
-  },
-  remainingBadgeText: {
+  capsulePercentLabel: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 11,
-    color: '#7C9B7A'
+    color: '#BA7517',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    position: 'absolute',
+    top: 35,
+  },
+  capsuleVolumeText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 28,
+    color: '#F3F1EC',
+    marginTop: 20,
+  },
+  capsuleGoalText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 16,
+    color: '#8B92A0',
+    marginTop: 2,
+  },
+  remainingBadgeMini: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 12,
+  },
+  remainingBadgeMiniText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10,
+    color: '#BA7517',
   },
   statsRow: {
     flexDirection: 'row',
@@ -762,9 +909,10 @@ const styles = StyleSheet.create({
     width: '48.5%',
     backgroundColor: '#171B22',
     borderWidth: 1.5,
-    borderRadius: 16,
-    padding: 14,
-    minHeight: 115,
+    borderRadius: 20,
+    padding: 16,
+    minHeight: 125,
+    position: 'relative',
   },
   drinkTopRow: {
     flexDirection: 'row',
@@ -772,9 +920,9 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   drinkIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center'
   },
@@ -804,7 +952,7 @@ const styles = StyleSheet.create({
     fontSize: 11
   },
   logPrimaryBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
@@ -903,9 +1051,9 @@ const styles = StyleSheet.create({
     fontSize: 11
   },
   challengeCard: {
-    backgroundColor: 'rgba(194, 168, 120, 0.06)',
+    backgroundColor: 'rgba(186, 117, 23, 0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.15)',
+    borderColor: 'rgba(186, 117, 23, 0.15)',
     borderRadius: 16,
     padding: 16,
     marginBottom: 24
@@ -913,7 +1061,7 @@ const styles = StyleSheet.create({
   challengeModeTitle: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 15,
-    color: '#C2A878'
+    color: '#BA7517'
   },
   challengeModeSubText: {
     fontFamily: 'PlusJakartaSans_500Medium',
@@ -923,7 +1071,7 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   challengeStartBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -952,7 +1100,7 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   challengeActionBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 20
@@ -1044,16 +1192,16 @@ const styles = StyleSheet.create({
     fontSize: 14
   },
   errorText: {
-    color: '#E11D48',
+    color: '#C47070',
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 12,
     marginBottom: 16,
     marginTop: -12
   },
   resetBtn: {
-    backgroundColor: 'rgba(194, 168, 120, 0.1)',
+    backgroundColor: 'rgba(186, 117, 23, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.2)',
+    borderColor: 'rgba(186, 117, 23, 0.2)',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
@@ -1061,7 +1209,89 @@ const styles = StyleSheet.create({
   },
   resetBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#C2A878',
+    color: '#BA7517',
     fontSize: 12
+  },
+  waveOverlay: {
+    position: 'absolute',
+    top: -6,
+    left: -20,
+    width: '130%',
+    height: 12,
+    backgroundColor: '#BA7517',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    opacity: 0.6,
+  },
+  belowGlassProgressContainer: {
+    width: '100%',
+    backgroundColor: '#171B22',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  progressTextRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  progressPercentageText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 14,
+    color: '#F3F1EC',
+  },
+  progressRemainingText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 12,
+    color: '#BA7517',
+  },
+  progressBarTrack: {
+    height: 8,
+    backgroundColor: '#0F1115',
+    borderRadius: 4,
+    width: '100%',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  cardSelectBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  emptyTimelineCard: {
+    backgroundColor: '#0F1115',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  emptyTimelineText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+    color: '#F3F1EC',
+  },
+  emptyTimelineSub: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    color: '#5A6070',
+    marginTop: 4,
+    textAlign: 'center',
   }
 });

@@ -27,6 +27,7 @@ function renderHabitsList(habits, logs) {
   
   habits.forEach((habit) => {
     const isCompletedToday = logs[habit.id] && logs[habit.id].includes(todayStr);
+    const currentStreak = typeof habit.streak === 'number' && !isNaN(habit.streak) ? habit.streak : 0;
     
     const row = document.createElement('div');
     row.className = 'habit-row';
@@ -36,7 +37,7 @@ function renderHabitsList(habits, logs) {
         <span class="habit-name">${habit.name}</span>
       </div>
       <div class="habit-streak" title="7-day badge active">
-        🔥 ${habit.streak}
+        🔥 ${currentStreak}
       </div>
     `;
     container.appendChild(row);
@@ -55,12 +56,12 @@ function renderHabitsList(habits, logs) {
       
       if (isChecked) {
         logs[id].push(todayStr);
-        habits[index].streak++;
+        habits[index].streak = (typeof habits[index].streak === 'number' && !isNaN(habits[index].streak) ? habits[index].streak : 0) + 1;
         addXP(15);
         logDailyActivity('task');
       } else {
         logs[id] = logs[id].filter(d => d !== todayStr);
-        habits[index].streak = Math.max(0, habits[index].streak - 1);
+        habits[index].streak = Math.max(0, (typeof habits[index].streak === 'number' && !isNaN(habits[index].streak) ? habits[index].streak : 0) - 1);
       }
       
       setStorageItem(HABITS_KEY, habits);

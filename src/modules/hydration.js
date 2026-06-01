@@ -5,6 +5,8 @@ const HYDRATION_KEY = 'hydration_logs';
 const HYDRATION_SETTINGS_KEY = 'hydration_settings';
 const HYDRATION_STATUS_KEY = 'hydration';
 
+let eventsInitialized = false;
+
 const defaultSettings = {
   goal: 2000,
   interval: 60,
@@ -28,7 +30,7 @@ export function initHydration() {
   const logs = getStorageItem(HYDRATION_KEY, []);
   
   updateHydrationUI(settings, logs);
-  setupHydrationEvents(settings, logs);
+  setupHydrationEvents();
   setupIntervalReminders(settings);
 }
 
@@ -234,7 +236,8 @@ function renderWaterLogsList(logs) {
   container.querySelectorAll('.delete-water-log').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;
-      const updated = logs.filter(l => l.id !== id);
+      const currentLogs = getStorageItem(HYDRATION_KEY, []);
+      const updated = currentLogs.filter(l => l.id !== id);
       setStorageItem(HYDRATION_KEY, updated);
       
       // Update hydration status for mobile sync
@@ -249,7 +252,10 @@ function renderWaterLogsList(logs) {
   });
 }
 
-function setupHydrationEvents(settings, logs) {
+function setupHydrationEvents() {
+  if (eventsInitialized) return;
+  eventsInitialized = true;
+
   // Sidebar widget click
   const widgetCard = document.getElementById('sidebar-water-widget-card');
   if (widgetCard) {
@@ -273,13 +279,14 @@ function setupHydrationEvents(settings, logs) {
       let ml = parseInt(btn.dataset.ml);
       let type = ml > 0 ? "Water" : "Coffee/Tea";
       
+      const settings = getStorageItem(HYDRATION_SETTINGS_KEY, defaultSettings);
       if (ml < 0 && !settings.diureticCoffee) {
         // Option toggled off, ignore coffee deductions
         ml = 200; // Log positive tea hydration
         type = "Tea";
       }
       
-      logBeverage(ml, type, settings, logs);
+      logBeverage(ml, type);
     });
   });
   
@@ -288,7 +295,7 @@ function setupHydrationEvents(settings, logs) {
   if (quickWaterBtn) {
     quickWaterBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      logBeverage(250, "Quick Water", settings, logs);
+      logBeverage(250, "Quick Water");
     });
   }
   
@@ -301,6 +308,7 @@ function setupHydrationEvents(settings, logs) {
       const quietCheck = document.getElementById('settings-water-quiet');
       
       if (goalInput && intervalSelect && quietCheck) {
+        const settings = getStorageItem(HYDRATION_SETTINGS_KEY, defaultSettings);
         settings.goal = parseInt(goalInput.value) || 2000;
         settings.interval = parseInt(intervalSelect.value) || 60;
         settings.quietHours = quietCheck.checked;
@@ -322,6 +330,7 @@ function setupHydrationEvents(settings, logs) {
   const coffeeToggle = document.getElementById('coffee-diuretic-toggle');
   if (coffeeToggle) {
     coffeeToggle.addEventListener('change', (e) => {
+      const settings = getStorageItem(HYDRATION_SETTINGS_KEY, defaultSettings);
       settings.diureticCoffee = e.target.checked;
       setStorageItem(HYDRATION_SETTINGS_KEY, settings);
     });
@@ -330,7 +339,10 @@ function setupHydrationEvents(settings, logs) {
 
 import { addXP, logDailyActivity } from './gamification.js';
 
-function logBeverage(amount, type, settings, logs) {
+function logBeverage(amount, type) {
+  const settings = getStorageItem(HYDRATION_SETTINGS_KEY, defaultSettings);
+  const logs = getStorageItem(HYDRATION_KEY, []);
+
   const newLog = {
     id: 'h_' + Date.now(),
     amount: amount,

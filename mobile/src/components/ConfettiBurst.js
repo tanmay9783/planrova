@@ -3,8 +3,8 @@ import { View, StyleSheet, Dimensions, Animated, Easing } from 'react-native';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-const COLORS = ['#C2A878', '#4B6BFB', '#7C9B7A', '#C47070', '#E5A93C', '#58B99C', '#7B93B0'];
-const GOLD_COLORS = ['#FFD700', '#F59E0B', '#C2A878', '#E5A93C', '#F3F1EC', '#FFA500'];
+const COLORS = ['#BA7517', '#4B6BFB', '#7C9B7A', '#C47070', '#E5A93C', '#58B99C', '#7B93B0'];
+const GOLD_COLORS = ['#FFD700', '#F59E0B', '#BA7517', '#E5A93C', '#F3F1EC', '#FFA500'];
 
 const ConfettiBurst = forwardRef(({ count = 40, goldOnly = false }, ref) => {
   const [particles, setParticles] = useState([]);

@@ -71,25 +71,20 @@ function createCalendarCell(dayNum, dateStr, isCurrentMonth, tasks, todayStr) {
   cell.className = `cal-cell ${isCurrentMonth ? '' : 'other-month'} ${dateStr === todayStr ? 'today' : ''}`;
   cell.dataset.date = dateStr;
   
+  // Filter tasks matching this cell date
+  const dayTasks = tasks.filter(t => t.date === dateStr && !t.completed);
+  const hasTasks = dayTasks.length > 0;
+  
   cell.innerHTML = `
     <span class="cal-cell-num">${dayNum}</span>
-    <div class="cal-cell-bullets"></div>
+    <div class="cal-cell-bullets">
+      ${hasTasks ? '<span class="cal-gold-dot" style="display:block; width:4px; height:4px; border-radius:50%; background:#BA7517; margin: 4px auto 0 auto;"></span>' : ''}
+    </div>
   `;
   
-  // Filter tasks matching this cell date
-  const dayTasks = tasks.filter(t => t.date === dateStr);
-  const bulletsContainer = cell.querySelector('.cal-cell-bullets');
-  
-  dayTasks.forEach(t => {
-    const dot = document.createElement('span');
-    dot.className = `cal-bullet-dot cat-${t.category || 'other'}`;
-    dot.title = t.title;
-    bulletsContainer.appendChild(dot);
-  });
-  
-  // Click on date cell to add task pre-filled with this date!
+  // Click on date cell to open Day Detail Panel
   cell.addEventListener('click', () => {
-    openAddTaskForDate(dateStr);
+    import('./tasks.js').then(m => m.openDayDetailPanel(dateStr));
   });
   
   return cell;

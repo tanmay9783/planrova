@@ -8,13 +8,16 @@ export function initThemeToggle() {
   const isLightMode = getStorageItem('planory_light_mode', false);
   if (isLightMode) {
     document.body.classList.add('theme-light');
+    document.body.classList.remove('dark');
   } else {
     document.body.classList.remove('theme-light');
+    document.body.classList.add('dark');
   }
 
   themeToggleBtn.addEventListener('click', () => {
     document.body.classList.add('theme-transitioning');
     document.body.classList.toggle('theme-light');
+    document.body.classList.toggle('dark');
     const currentlyLight = document.body.classList.contains('theme-light');
     setStorageItem('planory_light_mode', currentlyLight);
     
@@ -55,7 +58,7 @@ export function initZenMode() {
 }
 
 export function initLivePresence() {
-  const presenceCount = document.getElementById('presence-count');
+  const presenceCount = document.getElementById('presence-count-sidebar') || document.getElementById('presence-count');
   if (!presenceCount) return;
   
   // Base number of simulated users

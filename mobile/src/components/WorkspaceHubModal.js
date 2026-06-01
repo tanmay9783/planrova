@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -23,7 +23,7 @@ const MODULES = [
     id: 'water',
     screenName: 'HydrationWorkspace',
     title: 'Water Log',
-    desc: 'Log preset beverages & SVG stats',
+    desc: 'Log daily drinks and stats',
     icon: 'water',
     color: '#3B82F6',
     bgColor: 'rgba(59, 130, 246, 0.15)'
@@ -32,7 +32,7 @@ const MODULES = [
     id: 'budget',
     screenName: 'BudgetWorkspace',
     title: 'Budget',
-    desc: 'Log expenses & savings progress',
+    desc: 'Track expenses and savings',
     icon: 'cash',
     color: '#10B981',
     bgColor: 'rgba(16, 185, 129, 0.15)'
@@ -41,7 +41,7 @@ const MODULES = [
     id: 'timer',
     screenName: 'FocusWorkspace',
     title: 'Timer',
-    desc: 'Focus interval rounds and timers',
+    desc: 'Study with focus timers',
     icon: 'timer',
     color: '#F59E0B',
     bgColor: 'rgba(245, 158, 11, 0.15)'
@@ -50,7 +50,7 @@ const MODULES = [
     id: 'alarm',
     screenName: 'AlarmWorkspace',
     title: 'Alarms',
-    desc: 'Missions & Sleep intelligence',
+    desc: 'Wake up and track sleep',
     icon: 'alarm',
     color: '#EF4444',
     bgColor: 'rgba(239, 68, 68, 0.15)'
@@ -59,7 +59,7 @@ const MODULES = [
     id: 'profile',
     screenName: 'ProfileWorkspace',
     title: 'Profile',
-    desc: 'Student bio and goal edits',
+    desc: 'Manage bio and goals',
     icon: 'person',
     color: '#F97316',
     bgColor: 'rgba(249, 115, 22, 0.15)'
@@ -68,19 +68,19 @@ const MODULES = [
     id: 'notifications',
     screenName: 'NotificationCenterWorkspace',
     title: 'Quiet Hours',
-    desc: 'Study quiet hours & tones',
+    desc: 'Configure quiet hours',
     icon: 'notifications',
     color: '#6366F1',
     bgColor: 'rgba(99, 102, 241, 0.15)'
   },
   {
-    id: 'analytics',
-    screenName: 'AnalyticsWorkspace',
-    title: 'Analytics',
-    desc: 'Deep study stats & streaks',
-    icon: 'bar-chart',
-    color: '#7C9B7A',
-    bgColor: 'rgba(124, 155, 122, 0.15)'
+    id: 'calculator',
+    screenName: 'CalculatorWorkspace',
+    title: 'Calculator',
+    desc: 'GPA and target exam calculator',
+    icon: 'calculator',
+    color: '#BA7517',
+    bgColor: 'rgba(186, 117, 23, 0.15)'
   }
 ];
 
@@ -118,7 +118,7 @@ export default function WorkspaceHubModal({ visible, onClose }) {
     }
   };
 
-  const handleNavigate = async (module) => {
+  const handleNavigate = async (module, action = null) => {
     try {
       const historyStr = await AsyncStorage.getItem('hub_recently_accessed');
       let history = historyStr ? JSON.parse(historyStr) : [];
@@ -130,7 +130,42 @@ export default function WorkspaceHubModal({ visible, onClose }) {
       console.warn('Failed to update hub access history', e);
     }
     onClose();
-    navigation.navigate(module.screenName);
+    if (action) {
+      navigation.navigate(module.screenName, { action });
+    } else {
+      navigation.navigate(module.screenName);
+    }
+  };
+
+  const handleLongPress = (item) => {
+    if (item.id === 'notes') {
+      Alert.alert(
+        'Quick Action',
+        'Do you want to create a new note directly?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Create Note', onPress: () => handleNavigate(item, 'new_note') }
+        ]
+      );
+    } else if (item.id === 'budget') {
+      Alert.alert(
+        'Quick Action',
+        'Do you want to log an expense directly?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Log Expense', onPress: () => handleNavigate(item, 'log_expense') }
+        ]
+      );
+    } else if (item.id === 'timer') {
+      Alert.alert(
+        'Quick Action',
+        'Do you want to start focus timer directly?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Start Timer', onPress: () => handleNavigate(item, 'start_timer') }
+        ]
+      );
+    }
   };
 
   return (
@@ -154,6 +189,7 @@ export default function WorkspaceHubModal({ visible, onClose }) {
                 key={item.id}
                 style={styles.tile}
                 onPress={() => handleNavigate(item)}
+                onLongPress={() => handleLongPress(item)}
                 activeOpacity={0.8}
               >
                 <View style={styles.tileHeader}>

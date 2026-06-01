@@ -38,11 +38,88 @@ export default function ProfileScreen() {
   });
   const [gamification] = useFirestoreData('gamification', { level: 1, xp: 0 });
   const [tasks] = useFirestoreData('tasks', []);
-  const [hydration] = useFirestoreData('hydration', { water: 0, target: 8 });
+  const [hydration] = useFirestoreData('hydration', { water: 0, target: 2000 });
   const [hydrationLogs] = useFirestoreData('hydration_logs', []);
   const [streaks] = useFirestoreData('streaks', { tasks: 0, focus: 0, hydration: 0, habits: 0, budget: 0 });
   const [pomodoroStats] = useFirestoreData('pomodoro_stats', { roundsToday: 0 });
   const [xpHistory] = useFirestoreData('xp_history', []);
+
+  const getGroupedXpHistory = () => {
+    if (!xpHistory) return [];
+    const groups = {};
+    xpHistory.forEach(log => {
+      if (!log.reason) return;
+      const dateStr = new Date(log.timestamp).toDateString();
+      let type = 'other';
+      let baseReason = log.reason;
+
+      if (log.reason.startsWith('Daily login streak reward')) {
+        type = 'login';
+        const match = log.reason.match(/Day \d+/);
+        baseReason = `Daily login reward: ${match ? match[0] : 'Day 1'}`;
+      } else if (log.reason.startsWith('Logged expense')) {
+        type = 'expense';
+        baseReason = 'Logged expenses';
+      } else if (log.reason.startsWith('Logged hydration')) {
+        type = 'hydration';
+        baseReason = 'Logged hydration';
+      } else if (log.reason.startsWith('Completed habit')) {
+        type = 'habit';
+        baseReason = 'Completed habits';
+      } else if (log.reason.includes('Pomodoro') || log.reason.includes('Focus block') || log.reason.includes('focused')) {
+        type = 'focus';
+        baseReason = 'Focus sessions';
+      } else if (log.reason.startsWith('Completed task')) {
+        type = 'task';
+        baseReason = 'Completed tasks';
+      } else if (log.reason.startsWith('Attended class')) {
+        type = 'class';
+        baseReason = 'Attended classes';
+      } else if (log.reason.startsWith('Completed all daily quests')) {
+        type = 'quests';
+        baseReason = 'Completed daily quests';
+      } else if (log.reason.startsWith('Silenced wake-up alarm')) {
+        type = 'alarm';
+        baseReason = 'Silenced wake-up alarms';
+      } else if (log.reason.startsWith('Logged sleep session')) {
+        type = 'sleep';
+        baseReason = 'Logged sleep sessions';
+      }
+
+      const key = `${dateStr}_${type}_${baseReason}`;
+      if (!groups[key]) {
+        groups[key] = {
+          type,
+          baseReason,
+          count: 0,
+          totalXp: 0,
+          latestTimestamp: log.timestamp,
+          log: log
+        };
+      }
+      groups[key].count += 1;
+      groups[key].totalXp += log.amount;
+      if (log.timestamp > groups[key].latestTimestamp) {
+        groups[key].latestTimestamp = log.timestamp;
+      }
+    });
+
+    return Object.values(groups).map(g => {
+      let finalReason = g.baseReason;
+      if (g.count > 1) {
+        finalReason = `${g.baseReason} — ${g.count} times today (+${g.totalXp} XP total)`;
+      }
+      return {
+        id: g.log.id,
+        timestamp: g.latestTimestamp,
+        reason: finalReason,
+        amount: g.totalXp,
+        originalAmount: g.log.amount,
+        type: g.type,
+        count: g.count
+      };
+    }).sort((a, b) => b.timestamp - a.timestamp);
+  };
 
   // Custom ID Card state additions
   const [showQRModal, setShowQRModal] = useState(false);
@@ -193,7 +270,7 @@ export default function ProfileScreen() {
         
         let cellColor = '#1D2430'; // Empty
         if (dayCompletedCount >= 3) cellColor = '#7C9B7A'; // High
-        else if (dayCompletedCount >= 1) cellColor = 'rgba(194, 168, 120, 0.4)'; // Low/Mid
+        else if (dayCompletedCount >= 1) cellColor = 'rgba(186, 117, 23, 0.4)'; // Low/Mid
 
         rowCells.push(
           <View 
@@ -222,8 +299,8 @@ export default function ProfileScreen() {
         {(() => {
           const isGold = idCardTheme === 'gold';
           const cardBg = isGold ? '#171B22' : '#FFFFFF';
-          const cardBorder = isGold ? '#C2A878' : '#D1D5DB';
-          const cardTextPrimary = isGold ? '#C2A878' : '#0F1115';
+          const cardBorder = isGold ? '#BA7517' : '#D1D5DB';
+          const cardTextPrimary = isGold ? '#BA7517' : '#0F1115';
           const cardTextSecondary = isGold ? '#F3F1EC' : '#374151';
           const cardTextMuted = isGold ? '#5A6070' : '#6B7280';
 
@@ -300,15 +377,15 @@ export default function ProfileScreen() {
                           />
                         ) : (
                           <>
-                            <Ionicons name="person" size={36} color="rgba(194, 168, 120, 0.4)" />
+                            <Ionicons name="person" size={36} color="rgba(186, 117, 23, 0.4)" />
                             <View style={styles.photoOverlay}>
-                              <Ionicons name="camera-outline" size={12} color="#C2A878" />
+                              <Ionicons name="camera-outline" size={12} color="#BA7517" />
                             </View>
                           </>
                         )}
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.editCardBtn} onPress={() => setIsEditingCard(true)}>
-                        <Ionicons name="create-outline" size={14} color="#C2A878" style={{ marginRight: 4 }} />
+                        <Ionicons name="create-outline" size={14} color="#BA7517" style={{ marginRight: 4 }} />
                         <Text style={styles.editCardBtnText}>Edit ID</Text>
                       </TouchableOpacity>
                     </View>
@@ -404,10 +481,10 @@ export default function ProfileScreen() {
               </View>
 
               <View style={styles.qrDetails}>
-                <Text style={styles.qrDetailsText}><Text style={{ fontWeight: 'bold', color: '#C2A878' }}>Name:</Text> {profile.name}</Text>
-                <Text style={styles.qrDetailsText}><Text style={{ fontWeight: 'bold', color: '#C2A878' }}>College:</Text> {profile.college}</Text>
-                <Text style={styles.qrDetailsText}><Text style={{ fontWeight: 'bold', color: '#C2A878' }}>Branch:</Text> {profile.branch}</Text>
-                <Text style={styles.qrDetailsText}><Text style={{ fontWeight: 'bold', color: '#C2A878' }}>Level:</Text> LVL {gamification.level}</Text>
+                <Text style={styles.qrDetailsText}><Text style={{ fontWeight: 'bold', color: '#BA7517' }}>Name:</Text> {profile.name}</Text>
+                <Text style={styles.qrDetailsText}><Text style={{ fontWeight: 'bold', color: '#BA7517' }}>College:</Text> {profile.college}</Text>
+                <Text style={styles.qrDetailsText}><Text style={{ fontWeight: 'bold', color: '#BA7517' }}>Branch:</Text> {profile.branch}</Text>
+                <Text style={styles.qrDetailsText}><Text style={{ fontWeight: 'bold', color: '#BA7517' }}>Level:</Text> LVL {gamification.level}</Text>
               </View>
 
               <TouchableOpacity 
@@ -489,7 +566,7 @@ export default function ProfileScreen() {
             <View style={styles.heatmapLegend}>
               <Text style={styles.legendText}>Missed</Text>
               <View style={[styles.legendBox, { backgroundColor: '#1D2430' }]} />
-              <View style={[styles.legendBox, { backgroundColor: 'rgba(194, 168, 120, 0.4)' }]} />
+              <View style={[styles.legendBox, { backgroundColor: 'rgba(186, 117, 23, 0.4)' }]} />
               <View style={[styles.legendBox, { backgroundColor: '#7C9B7A' }]} />
               <Text style={styles.legendText}>Productive</Text>
             </View>
@@ -506,9 +583,9 @@ export default function ProfileScreen() {
             </View>
           ) : (
             <View style={styles.historyContainer}>
-              {xpHistory.slice(0, 10).map((log, idx) => (
+              {getGroupedXpHistory().slice(0, 10).map((log, idx) => (
                 <View key={log.id || idx} style={styles.historyRow}>
-                  <View style={[styles.historyDot, { backgroundColor: log.amount > 15 ? '#C2A878' : log.amount > 9 ? '#4B6BFB' : '#7C9B7A' }]} />
+                  <View style={[styles.historyDot, { backgroundColor: log.amount > 15 ? '#BA7517' : log.amount > 9 ? '#4B6BFB' : '#7C9B7A' }]} />
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.historyReason}>{log.reason}</Text>
                     <Text style={styles.historyTime}>{new Date(log.timestamp).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}</Text>
@@ -543,12 +620,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#171B22',
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#C2A878',
+    borderColor: '#BA7517',
     padding: 20,
     marginBottom: 24,
     position: 'relative',
     overflow: 'hidden',
-    shadowColor: '#C2A878',
+    shadowColor: '#BA7517',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -561,7 +638,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(194, 168, 120, 0.08)',
+    backgroundColor: 'rgba(186, 117, 23, 0.08)',
     filter: 'blur(20px)'
   },
   idCardHeader: {
@@ -582,10 +659,10 @@ const styles = StyleSheet.create({
   chipLayout: {
     width: 28,
     height: 20,
-    backgroundColor: 'rgba(194, 168, 120, 0.25)',
+    backgroundColor: 'rgba(186, 117, 23, 0.25)',
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.4)'
+    borderColor: 'rgba(186, 117, 23, 0.4)'
   },
   idCardBody: {
     flexDirection: 'row'
@@ -623,7 +700,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
-    backgroundColor: 'rgba(194, 168, 120, 0.08)',
+    backgroundColor: 'rgba(186, 117, 23, 0.08)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6
@@ -631,7 +708,7 @@ const styles = StyleSheet.create({
   editCardBtnText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 10,
-    color: '#C2A878'
+    color: '#BA7517'
   },
   idCardRight: {
     flex: 1,
@@ -640,7 +717,7 @@ const styles = StyleSheet.create({
   idCardName: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 18,
-    color: '#C2A878',
+    color: '#BA7517',
     marginBottom: 8
   },
   idCardLabel: {
@@ -703,7 +780,7 @@ const styles = StyleSheet.create({
   },
   btnSave: {
     flex: 1,
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center'
@@ -733,7 +810,7 @@ const styles = StyleSheet.create({
   statVal: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 16,
-    color: '#C2A878'
+    color: '#BA7517'
   },
   statLabel: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
@@ -772,7 +849,7 @@ const styles = StyleSheet.create({
     marginRight: 16
   },
   badgeIconBgUnlocked: {
-    backgroundColor: '#C2A878'
+    backgroundColor: '#BA7517'
   },
   badgeTextCol: {
     flex: 1
@@ -898,7 +975,7 @@ const styles = StyleSheet.create({
   },
   historyXp: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    color: '#C2A878',
+    color: '#BA7517',
     fontSize: 13
   },
 
@@ -998,7 +1075,7 @@ const styles = StyleSheet.create({
     color: '#F3F1EC',
   },
   qrCloseBtn: {
-    backgroundColor: '#C2A878',
+    backgroundColor: '#BA7517',
     width: '100%',
     paddingVertical: 14,
     borderRadius: 12,

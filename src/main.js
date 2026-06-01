@@ -1,5 +1,5 @@
 import './style.css';
-import { preloadCache } from './utils/storage.js';
+import { preloadCache, getStorageItem } from './utils/storage.js';
 import { initProfile } from './modules/profile.js';
 import { initThemes } from './modules/themes.js';
 import { initQuotes } from './modules/quotes.js';
@@ -18,6 +18,41 @@ import { initThemeToggle, initZenMode, initLivePresence, initCollapsibleSections
 import { initAuth } from './modules/auth.js';
 import { auth } from './db/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
+
+import { COLORS, TYPOGRAPHY, BORDER_RADIUS } from './utils/tokens.js';
+import { initCommandPalette } from './modules/command-palette.js';
+
+function injectCSSVariables() {
+  const root = document.documentElement;
+  root.style.setProperty('--accent', COLORS.GOLD);
+  root.style.setProperty('--bg-app', COLORS.DARK_BG);
+  root.style.setProperty('--bg-sidebar', COLORS.CARD_BG);
+  root.style.setProperty('--bg-card', COLORS.CARD_BG);
+  root.style.setProperty('--border-color', COLORS.BORDER);
+  
+  root.style.setProperty('--color-notes', COLORS.notes);
+  root.style.setProperty('--color-water', COLORS.water);
+  root.style.setProperty('--color-budget', COLORS.budget);
+  root.style.setProperty('--color-timer', COLORS.timer);
+  root.style.setProperty('--color-alarms', COLORS.alarms);
+
+  root.style.setProperty('--font-xs', `${TYPOGRAPHY.xs}px`);
+  root.style.setProperty('--font-sm', `${TYPOGRAPHY.sm}px`);
+  root.style.setProperty('--font-base', `${TYPOGRAPHY.base}px`);
+  root.style.setProperty('--font-lg', `${TYPOGRAPHY.lg}px`);
+  root.style.setProperty('--font-xl', `${TYPOGRAPHY.xl}px`);
+  root.style.setProperty('--font-2xl', `${TYPOGRAPHY.xxl}px`);
+  root.style.setProperty('--line-height-body', TYPOGRAPHY.lineHeight.body);
+  root.style.setProperty('--line-height-heading', TYPOGRAPHY.lineHeight.heading);
+
+  root.style.setProperty('--radius-xs', `${BORDER_RADIUS.xs}px`);
+  root.style.setProperty('--radius-sm', `${BORDER_RADIUS.sm}px`);
+  root.style.setProperty('--radius-md', `${BORDER_RADIUS.md}px`);
+  root.style.setProperty('--radius-lg', `${BORDER_RADIUS.lg}px`);
+  root.style.setProperty('--radius-xl', `${BORDER_RADIUS.xl}px`);
+}
+
+injectCSSVariables();
 
 console.log("⚡ main.js evaluated!");
 
@@ -44,6 +79,7 @@ function runInit() {
   safeInit('BudgetTracker', initBudgetTracker);
   safeInit('Hydration', initHydration);
   safeInit('Notes', initNotes);
+  safeInit('CommandPalette', initCommandPalette);
 
   // 3. Setup General Layout Triggers & Navigation switches
   safeInit('GeneralUI', setupGeneralUI);
@@ -259,6 +295,33 @@ function setupGeneralUI() {
     });
   }
 
+  // Sidebar Nav clicks
+  const sidebarNavNotes = document.getElementById('sidebar-nav-notes');
+  const sidebarNavTimer = document.getElementById('sidebar-nav-timer');
+
+  if (sidebarNavNotes) {
+    sidebarNavNotes.addEventListener('click', () => {
+      document.getElementById('notes-library-modal-overlay').classList.remove('hidden');
+      renderNotesLibrary();
+    });
+  }
+
+  if (sidebarNavTimer) {
+    sidebarNavTimer.addEventListener('click', () => {
+      document.getElementById('pomodoro-modal-overlay').classList.remove('hidden');
+    });
+  }
+
+  // Sync active states on sidebar nav
+  const navItems = document.querySelectorAll('.nav-item');
+
+  navItems.forEach(item => {
+    item.addEventListener('click', () => {
+      navItems.forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+
   // Close modals when clicking overlay outside card
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', (e) => {
@@ -302,4 +365,151 @@ function setupGeneralUI() {
       }
     });
   }
+
+  // Shortcuts modal close
+  const shortcutsClose = document.getElementById('shortcuts-close-btn');
+  if (shortcutsClose) {
+    shortcutsClose.addEventListener('click', () => {
+      document.getElementById('shortcuts-modal-overlay').classList.add('hidden');
+    });
+  }
+
+  // Mobile Bottom Tab clicks
+  const mobWeekly = document.getElementById('mobile-tab-weekly');
+  const mobSchedule = document.getElementById('mobile-tab-schedule');
+  const mobNotes = document.getElementById('mobile-tab-notes');
+  const mobTimer = document.getElementById('mobile-tab-timer');
+  
+  if (mobWeekly) {
+    mobWeekly.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      mobWeekly.classList.add('active');
+      const btn = document.getElementById('view-weekly-btn');
+      if (btn) btn.click();
+    });
+  }
+  if (mobSchedule) {
+    mobSchedule.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      mobSchedule.classList.add('active');
+      const btn = document.getElementById('view-calendar-btn');
+      if (btn) btn.click();
+    });
+  }
+  if (mobNotes) {
+    mobNotes.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      mobNotes.classList.add('active');
+      document.getElementById('notes-library-modal-overlay').classList.remove('hidden');
+      renderNotesLibrary();
+    });
+  }
+  if (mobTimer) {
+    mobTimer.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      mobTimer.classList.add('active');
+      document.getElementById('pomodoro-modal-overlay').classList.remove('hidden');
+    });
+  }
+
+  // Sync mobile dashboard values periodically
+  setInterval(syncMobileDashboard, 1000);
+
+  setupKeyboardShortcuts();
+}
+
+function setupKeyboardShortcuts() {
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const overlays = document.querySelectorAll('.modal-overlay, .notes-drawer-overlay, .day-detail-panel, #command-palette-overlay, #shortcuts-modal-overlay');
+      overlays.forEach(overlay => overlay.classList.add('hidden'));
+    }
+    
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      const palette = document.getElementById('command-palette-overlay');
+      if (palette) {
+        palette.classList.toggle('hidden');
+        if (!palette.classList.contains('hidden')) {
+          document.getElementById('command-palette-input').focus();
+        }
+      }
+    }
+    
+    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+      e.preventDefault();
+      const sheet = document.getElementById('shortcuts-modal-overlay');
+      if (sheet) sheet.classList.toggle('hidden');
+    }
+    
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+      e.preventDefault();
+      const todayStr = new Date().toISOString().split('T')[0];
+      import('./modules/notes.js').then(m => {
+        m.openNotesDrawer(todayStr);
+      });
+    }
+    
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 't') {
+      e.preventDefault();
+      document.getElementById('pomodoro-modal-overlay').classList.remove('hidden');
+    }
+    
+    // Check if user is typing in inputs to prevent triggering nav shortcuts
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+      return;
+    }
+    
+    if (e.key === '1') {
+      const btn = document.getElementById('view-weekly-btn');
+      if (btn) btn.click();
+    } else if (e.key === '2') {
+      const habitsSection = document.getElementById('habits-section');
+      if (habitsSection) habitsSection.classList.remove('collapsed');
+    } else if (e.key === '3') {
+      const notesBtn = document.getElementById('notes-library-modal-overlay');
+      if (notesBtn) {
+        notesBtn.classList.remove('hidden');
+        import('./modules/notes.js').then(m => m.renderNotesLibrary());
+      }
+    } else if (e.key === '4') {
+      document.getElementById('pomodoro-modal-overlay').classList.remove('hidden');
+    } else if (e.key === '5') {
+      const btn = document.getElementById('view-calendar-btn');
+      if (btn) btn.click();
+    }
+  });
+}
+
+function syncMobileDashboard() {
+  const levelState = getStorageItem('gamification', { level: 1, xp: 0, tasksCompletedToday: 0, waterLoggedToday: 0 });
+  const waterState = getStorageItem('hydration', { loggedToday: 0, goal: 2000 });
+  
+  const mobLevel = document.getElementById('mobile-level-display');
+  const mobXp = document.getElementById('mobile-xp-display');
+  const mobStreak = document.getElementById('mobile-streak-display');
+  const mobWaterVol = document.getElementById('mobile-water-volume');
+  const mobWaterPct = document.getElementById('mobile-water-pct');
+  const mobScoreLetter = document.getElementById('mobile-score-letter');
+  
+  const levelDisplay = document.getElementById('level-display');
+  if (mobLevel && levelDisplay) mobLevel.textContent = levelDisplay.textContent;
+  
+  const xpDisplay = document.getElementById('xp-display');
+  if (mobXp && xpDisplay) mobXp.textContent = xpDisplay.textContent;
+  
+  const streakEl = document.getElementById('streak-count');
+  if (mobStreak && streakEl) mobStreak.textContent = streakEl.textContent;
+  
+  // water
+  const waterVolume = levelState.waterLoggedToday ? levelState.waterLoggedToday * 250 : 0;
+  const waterGoal = waterState.goal || 2000;
+  const pct = Math.round((waterVolume / waterGoal) * 100);
+  if (mobWaterVol) mobWaterVol.textContent = `${waterVolume} / ${waterGoal} ml`;
+  if (mobWaterPct) mobWaterPct.textContent = `${pct}% complete`;
+  
+  // score
+  const scoreLetterEl = document.getElementById('daily-score-letter');
+  if (mobScoreLetter && scoreLetterEl) mobScoreLetter.textContent = `${scoreLetterEl ? scoreLetterEl.textContent : 'F'} Score`;
 }
