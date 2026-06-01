@@ -552,6 +552,6 @@ function syncMobileDashboard() {
   // pet/plant emoji
   const petContainer = document.getElementById('virtual-pet-container');
   if (mobPetEmoji && petContainer) {
-    mobPetEmoji.textContent = petContainer.textContent;
+    mobPetEmoji.innerHTML = petContainer.innerHTML;
   }
 }

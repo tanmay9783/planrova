@@ -27,11 +27,13 @@ export function initHydration() {
   if (typeof settings.goal !== 'number') settings.goal = 2000;
   if (typeof settings.interval !== 'number') settings.interval = 60;
 
-  const logs = getStorageItem(HYDRATION_KEY, []);
+  let logs = getStorageItem(HYDRATION_KEY, []);
+  if (!Array.isArray(logs)) logs = [];
   
   updateHydrationUI(settings, logs);
   setupHydrationEvents();
   setupIntervalReminders(settings);
+  renderCustomBeverages();
 }
 
 function updateHydrationUI(settings, logs) {
@@ -61,7 +63,7 @@ function updateHydrationUI(settings, logs) {
     ringFill.style.strokeDashoffset = offset;
     
     if (progressPct >= 100) {
-      if (statusText) statusText.textContent = "Goal reached! 🎉";
+      if (statusText) statusText.textContent = "Goal reached!";
     } else {
       if (statusText) statusText.textContent = totalToday > 0 ? "Staying hydrated!" : "Drink some water!";
     }
@@ -192,15 +194,15 @@ function calculateHydrationStreaks(logs, goal) {
   // Milestone badges
   badgesList.innerHTML = '';
   const milestones = [
-    { days: 7, badge: '⭐' },
-    { days: 14, badge: '🌟' },
-    { days: 30, badge: '🏆' }
+    { days: 7, badge: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" style="color:#fbbf24; margin-right:2px; display:inline-block;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>` },
+    { days: 14, badge: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" style="color:#fbbf24; margin-right:2px; display:inline-block;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>` },
+    { days: 30, badge: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="color:#fbbf24; margin-right:2px; display:inline-block;"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34M12 2a7 7 0 0 0-7 7c0 2.52 1.34 4.73 3.33 6h7.34A7 7 0 0 0 12 2z"/></svg>` }
   ];
   
   milestones.forEach(m => {
     if (streak >= m.days) {
       const bSpan = document.createElement('span');
-      bSpan.textContent = m.badge;
+      bSpan.innerHTML = m.badge;
       bSpan.title = `Milestone hit: ${m.days} Day streak!`;
       badgesList.appendChild(bSpan);
     }
@@ -231,12 +233,15 @@ function renderWaterLogsList(logs) {
     row.style.padding = '6px 0';
     
     const isCoffee = parseInt(log.amount) < 0;
+    const logIcon = isCoffee 
+      ? `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" style="color:#f87171; display:block;"><path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" x2="14" y1="11" y2="15"/></svg>`
+      : `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" style="color:#789ed4; display:block;"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`;
     row.innerHTML = `
       <div style="display:flex; align-items:center; gap:8px;">
-        <span style="font-size:14px;">${isCoffee ? '☕' : '💧'}</span>
+        <span style="display:inline-flex; align-items:center;">${logIcon}</span>
         <span style="font-size:12px; font-weight:600; color:${isCoffee ? '#f87171' : '#e3e3e6'}">${log.type}: ${log.amount}ml</span>
       </div>
-      <button class="icon-btn delete-water-log" data-id="${log.id}" style="font-size:10px;">🗑️</button>
+      <button class="icon-btn delete-water-log" data-id="${log.id}" style="display:inline-flex; align-items:center; justify-content:center; padding:4px;"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" style="display:block;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
     `;
     container.appendChild(row);
   });
@@ -270,6 +275,35 @@ function setupHydrationEvents() {
     quickBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       logBeverage(250, "Quick Water");
+    });
+  }
+
+  // Custom beverage creator button listener
+  const addCustomBtn = document.getElementById('add-custom-drink-btn');
+  if (addCustomBtn) {
+    addCustomBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const nameInput = document.getElementById('custom-drink-name');
+      const amountInput = document.getElementById('custom-drink-amount');
+      if (nameInput && amountInput) {
+        const name = nameInput.value.trim();
+        const amount = parseInt(amountInput.value);
+        if (name && amount > 0) {
+          const customs = getStorageItem('custom_beverages', []);
+          if (!customs.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+            customs.push({ name, amount });
+            setStorageItem('custom_beverages', customs);
+            renderCustomBeverages();
+            nameInput.value = '';
+            amountInput.value = '';
+            showToast(`Added ${name} preset!`);
+          } else {
+            showToast("Beverage already exists");
+          }
+        } else {
+          showToast("Enter a valid name and volume");
+        }
+      }
     });
   }
 
@@ -333,7 +367,7 @@ function setupHydrationEvents() {
         setStorageItem(HYDRATION_STATUS_KEY, dailyStatus);
         
         initHydration();
-        showToast("Water settings saved! 💧");
+        showToast("Water settings saved!");
       }
       return;
     }
@@ -374,7 +408,7 @@ function logBeverage(amount, type) {
     setStorageItem(HYDRATION_STATUS_KEY, { water: todayVol, target: settings.goal });
     
     initHydration();
-    showToast(amount > 0 ? `Logged +${amount}ml of hydration! 💧` : `Logged coffee: ${amount}ml deduction! ☕`);
+    showToast(amount > 0 ? `Logged +${amount}ml of hydration!` : `Logged coffee: ${amount}ml deduction!`);
     
     if (amount > 0) {
       addXP(5);
@@ -461,4 +495,24 @@ function showToast(msg) {
   document.getElementById('notif-msg').textContent = msg;
   toast.classList.remove('hidden');
   setTimeout(() => toast.classList.add('hidden'), 3000);
+}
+
+function renderCustomBeverages() {
+  const container = document.getElementById('water-presets-grid');
+  if (!container) return;
+
+  container.querySelectorAll('.custom-preset-btn').forEach(btn => btn.remove());
+
+  const customs = getStorageItem('custom_beverages', []);
+  if (!Array.isArray(customs)) return;
+
+  customs.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-ghost log-water-preset custom-preset-btn';
+    btn.dataset.ml = c.amount;
+    btn.style.padding = '8px 12px';
+    btn.style.fontSize = '12px';
+    btn.textContent = `${c.name} (${c.amount}ml)`;
+    container.appendChild(btn);
+  });
 }

@@ -1,4 +1,5 @@
 import { getStorageItem, setStorageItem } from '../utils/storage.js';
+import { formatDate } from '../utils/date.js';
 
 const GAMIFICATION_KEY = 'gamification';
 
@@ -11,14 +12,99 @@ const defaultState = {
   lastUpdated: new Date().toDateString()
 };
 
-const PET_STAGES = [
-  { minLevel: 1, emoji: '🌱', msg: 'Your plant is sprouting! Add tasks to grow it.' },
-  { minLevel: 3, emoji: '🌿', msg: 'Your plant is growing leaves! Keep it up!' },
-  { minLevel: 5, emoji: '🪴', msg: 'Your plant is healthy and potted!' },
-  { minLevel: 10, emoji: '🌳', msg: 'Your plant has become a mighty tree!' },
-  { minLevel: 15, emoji: '🌸', msg: 'Your tree is blossoming beautifully!' },
-  { minLevel: 20, emoji: '✨🌳✨', msg: 'A magical glowing tree of ultimate focus!' }
+const CORE_STAGES = [
+  { minLevel: 1, name: 'Basic Core', msg: 'Focus Core is online. Complete tasks to power it up!' },
+  { minLevel: 3, name: 'Dual Core', msg: 'Focus Core has evolved to Dual Core status!' },
+  { minLevel: 5, name: 'Tri-Core', msg: 'Focus Core is glowing brightly with clean energy!' },
+  { minLevel: 10, name: 'Quad-Core', msg: 'Focus Core is highly efficient and spinning rapidly!' },
+  { minLevel: 15, name: 'Nova Core', msg: 'Focus Core is pulsing at maximum focus capacity!' },
+  { minLevel: 20, name: 'Quantum Core', msg: 'Focus Core has reached ultimate quantum synchronization!' }
 ];
+
+export function getCoreSVG(level, isSleepy, isThirsty) {
+  let color = 'var(--accent)';
+  let spinDuration = '6s';
+  let orbitRings = 1;
+  let hasOuterNodes = false;
+  let pulseClass = '';
+
+  if (isThirsty) {
+    color = '#f87171'; // Warning red
+    spinDuration = '0s'; // Static
+    pulseClass = 'thirsty-pulse';
+  } else if (isSleepy) {
+    color = '#4b5563'; // Sleepy gray
+    spinDuration = '20s'; // Very slow
+  } else {
+    // Normal active states
+    if (level >= 20) {
+      color = '#a78bfa'; // Purple
+      spinDuration = '2s';
+      orbitRings = 4;
+      hasOuterNodes = true;
+      pulseClass = 'quantum-pulse';
+    } else if (level >= 15) {
+      color = '#10b981'; // Green
+      spinDuration = '3s';
+      orbitRings = 3;
+      hasOuterNodes = true;
+      pulseClass = 'nova-pulse';
+    } else if (level >= 10) {
+      color = '#3b82f6'; // Blue
+      spinDuration = '4s';
+      orbitRings = 3;
+      hasOuterNodes = true;
+    } else if (level >= 5) {
+      color = '#fbbf24'; // Yellow
+      spinDuration = '5s';
+      orbitRings = 2;
+    } else if (level >= 3) {
+      color = '#ec4899'; // Pink
+      spinDuration = '6s';
+      orbitRings = 2;
+    }
+  }
+
+  // Generate rings HTML
+  let ringsHTML = '';
+  for (let i = 1; i <= orbitRings; i++) {
+    const radius = 14 + i * 8;
+    const direction = i % 2 === 0 ? 'reverse' : 'normal';
+    ringsHTML += `
+      <circle cx="50" cy="50" r="${radius}" 
+        fill="none" 
+        stroke="${color}" 
+        stroke-width="1.5" 
+        stroke-dasharray="8 6" 
+        style="transform-origin: center; animation: spinCore ${spinDuration} linear infinite ${direction}; opacity: ${0.8 - i * 0.15};" 
+      />`;
+  }
+
+  // Orbiting outer nodes if level is high
+  let nodesHTML = '';
+  if (hasOuterNodes && !isThirsty && !isSleepy) {
+    nodesHTML = `
+      <circle cx="50" cy="10" r="3" fill="${color}" style="transform-origin: center; animation: spinCore 4s linear infinite;" />
+      <circle cx="50" cy="90" r="3" fill="${color}" style="transform-origin: center; animation: spinCore 4s linear infinite reverse;" />
+    `;
+  }
+
+  // Central orb
+  const centralOrbRadius = isThirsty ? 8 : (isSleepy ? 10 : 12);
+  const coreHTML = `
+    <svg viewBox="0 0 100 100" class="focus-core-svg ${pulseClass}" style="width: 100%; height: 100%; overflow: visible; display: block;">
+      <!-- Glowing background aura -->
+      <circle cx="50" cy="50" r="${centralOrbRadius}" fill="${color}" style="opacity: 0.35; filter: blur(4px); transform-origin: center; animation: pulseCore 2s ease-in-out infinite alternate;" />
+      <!-- Central solid core -->
+      <circle cx="50" cy="50" r="${centralOrbRadius}" fill="${color}" style="transform-origin: center;" />
+      <!-- Orbiting dashed rings -->
+      ${ringsHTML}
+      <!-- Orbiting nodes -->
+      ${nodesHTML}
+    </svg>
+  `;
+  return coreHTML;
+}
 
 export function initGamification() {
   checkDailyReset();
@@ -150,25 +236,50 @@ function updateUI() {
   const petMsg = document.getElementById('pet-status-msg');
   
   if (petContainer && petMsg) {
-    let currentStage = PET_STAGES[0];
-    for (let i = PET_STAGES.length - 1; i >= 0; i--) {
-      if (state.level >= PET_STAGES[i].minLevel) {
-        currentStage = PET_STAGES[i];
+    // Check if thirsty (no logs in last 4 hours or no logs today)
+    const logs = getStorageItem('hydration_logs', []);
+    const todayStr = formatDate(new Date());
+    const todayLogs = logs.filter(l => l.date === todayStr);
+    let isThirsty = false;
+    
+    if (todayLogs.length === 0) {
+      isThirsty = true;
+    } else {
+      const latestLog = todayLogs.reduce((latest, current) => {
+        const currentEpoch = parseInt(current.id.replace('h_', '')) || 0;
+        const latestEpoch = parseInt(latest.id.replace('h_', '')) || 0;
+        return currentEpoch > latestEpoch ? current : latest;
+      }, todayLogs[0]);
+      const latestEpoch = parseInt(latestLog.id.replace('h_', '')) || 0;
+      if (Date.now() - latestEpoch > 4 * 60 * 60 * 1000) {
+        isThirsty = true;
+      }
+    }
+
+    const isSleepy = state.tasksCompletedToday === 0 && state.level > 1;
+
+    let currentStage = CORE_STAGES[0];
+    for (let i = CORE_STAGES.length - 1; i >= 0; i--) {
+      if (state.level >= CORE_STAGES[i].minLevel) {
+        currentStage = CORE_STAGES[i];
         break;
       }
     }
     
-    petContainer.textContent = currentStage.emoji;
-    petMsg.textContent = currentStage.msg;
+    petContainer.innerHTML = getCoreSVG(state.level, isSleepy, isThirsty);
     
-    // Add sleepy effect if no tasks completed today
-    if (state.tasksCompletedToday === 0 && state.level > 1) {
-      petContainer.style.opacity = '0.6';
-      petContainer.style.animation = 'none'; // Stop floating
-      petMsg.textContent = `${currentStage.emoji} is feeling sleepy... do a task to wake it up!`;
+    if (isThirsty) {
+      petMsg.textContent = "Focus Core depleted. Log hydration to revive.";
+      petContainer.style.opacity = '0.5';
+      petContainer.style.animation = 'none';
+    } else if (isSleepy) {
+      petMsg.textContent = "Focus Core is in low-power standby mode. Complete a task to activate.";
+      petContainer.style.opacity = '0.7';
+      petContainer.style.animation = 'floatFlame 4s ease-in-out infinite alternate';
     } else {
+      petMsg.textContent = currentStage.msg;
       petContainer.style.opacity = '1';
-      petContainer.style.animation = 'floatFlame 3s ease-in-out infinite alternate';
+      petContainer.style.animation = 'floatFlame 2.5s ease-in-out infinite alternate';
     }
   }
 
@@ -299,19 +410,20 @@ function playLevelUpEffect(level) {
 
   // Get stage name
   const state = getStorageItem(GAMIFICATION_KEY, defaultState);
-  let currentStage = PET_STAGES[0];
-  for (let i = PET_STAGES.length - 1; i >= 0; i--) {
-    if (level >= PET_STAGES[i].minLevel) {
-      currentStage = PET_STAGES[i];
+  let currentStage = CORE_STAGES[0];
+  for (let i = CORE_STAGES.length - 1; i >= 0; i--) {
+    if (level >= CORE_STAGES[i].minLevel) {
+      currentStage = CORE_STAGES[i];
       break;
     }
   }
 
+  const svgHTML = getCoreSVG(level, false, false);
   card.innerHTML = `
-    <div style="font-size: 64px; margin-bottom: 20px; animation: floatFlame 3s ease-in-out infinite alternate;">${currentStage.emoji}</div>
+    <div style="width: 80px; height: 80px; margin: 0 auto 20px auto; animation: floatFlame 3s ease-in-out infinite alternate;">${svgHTML}</div>
     <h2 style="font-family: var(--font-display); font-size: 26px; font-weight: 800; color: #fff; margin-bottom: 8px;">Level Up!</h2>
     <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 24px;">
-      You have evolved into a <strong>${currentStage.emoji} ${currentStage.name}</strong> at Level ${level}!
+      Your Focus Core has evolved to <strong>${currentStage.name}</strong> at Level ${level}!
     </p>
     <button class="btn-primary" id="level-up-confirm-btn" style="width: 100%; padding: 12px; border-radius: 12px; font-weight: 700;">Continue ✓</button>
   `;

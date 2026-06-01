@@ -3283,4 +3283,145 @@ body.theme-light select option {
   color: var(--text-primary) !important;
 }
 
+/* Focus Core animations */
+@keyframes spinCore {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes pulseCore {
+  0% { transform: scale(1); opacity: 0.35; filter: blur(4px); }
+  100% { transform: scale(1.15); opacity: 0.55; filter: blur(6px); }
+}
+.focus-core-svg.thirsty-pulse {
+  animation: thirstyCorePulse 2s ease-in-out infinite alternate;
+}
+@keyframes thirstyCorePulse {
+  0% { filter: drop-shadow(0 0 2px rgba(248, 113, 113, 0.2)); }
+  100% { filter: drop-shadow(0 0 10px rgba(248, 113, 113, 0.7)); }
+}
+.focus-core-svg.quantum-pulse {
+  animation: quantumCorePulse 1.5s ease-in-out infinite alternate;
+}
+@keyframes quantumCorePulse {
+  0% { filter: drop-shadow(0 0 4px rgba(167, 139, 250, 0.3)); }
+  100% { filter: drop-shadow(0 0 12px rgba(167, 139, 250, 0.8)); }
+}
+.focus-core-svg.nova-pulse {
+  animation: novaCorePulse 1.8s ease-in-out infinite alternate;
+}
+@keyframes novaCorePulse {
+  0% { filter: drop-shadow(0 0 3px rgba(16, 185, 129, 0.3)); }
+  100% { filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.7)); }
+}
+
+/* Weather particles and overlays */
+.weather-particle {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+  border-radius: 50%;
+}
+.weather-particle.rain-drop {
+  width: 1px;
+  height: 18px;
+  background: rgba(120, 158, 212, 0.35);
+  border-radius: 0;
+  animation: rainFall 2s infinite linear;
+}
+@keyframes rainFall {
+  0% { transform: translateY(-20px) translateX(0); opacity: 0; }
+  10% { opacity: 0.7; }
+  90% { opacity: 0.7; }
+  100% { transform: translateY(320px) translateX(10px); opacity: 0; }
+}
+.weather-particle.star-particle {
+  width: 3px;
+  height: 3px;
+  background: #fff;
+  box-shadow: 0 0 6px #fff;
+  animation: midnightStar 4s infinite ease-in-out alternate;
+}
+@keyframes midnightStar {
+  0% { transform: translateY(0) scale(0.6); opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { transform: translateY(30px) scale(1.1); opacity: 0.2; }
+}
+.weather-particle.spark-particle {
+  width: 4px;
+  height: 4px;
+  background: #f97316;
+  box-shadow: 0 0 6px #f97316;
+  animation: fireSpark 3s infinite linear;
+}
+@keyframes fireSpark {
+  0% { transform: translateY(150px) translateX(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-20px) translateX(20px) scale(0.2); opacity: 0; }
+}
+.weather-particle.morning-drifter {
+  width: 6px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  filter: blur(1px);
+  animation: morningDrifter 6s infinite ease-in-out;
+}
+@keyframes morningDrifter {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% { transform: translateY(180px) translateX(40px); opacity: 0; }
+}
+
+/* Immersive notes scratchpad overlay */
+#pomo-immersive-notes-panel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 320px;
+  background: rgba(18, 18, 18, 0.95);
+  border-left: 1px solid var(--border-color);
+  backdrop-filter: blur(12px);
+  z-index: 2100;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+}
+#pomo-immersive-notes-panel.hidden {
+  display: none !important;
+}
+#pomo-notes-toggle-btn {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 64px;
+  background: rgba(18, 18, 18, 0.95);
+  border: 1px solid var(--border-color);
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  z-index: 2110;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--text-secondary);
+}
+#pomo-notes-toggle-btn:hover {
+  color: var(--accent);
+}
+#pomo-notes-toggle-btn.hidden {
+  display: none !important;
+}
+
+/* Drag and Drop glow animations */
+.drag-hover-glow {
+  box-shadow: 0 0 15px var(--accent) !important;
+  border-color: var(--accent) !important;
+  transform: scale(1.03);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 

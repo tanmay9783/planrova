@@ -17,8 +17,7 @@ export function appendNotesButtonToHeader(headerEl, dateStr) {
   const btn = document.createElement('button');
   btn.className = 'icon-btn notes-header-btn';
   btn.title = 'Open Notes for this Day';
-  btn.innerHTML = '📝';
-  btn.style.fontSize = '12px';
+  btn.innerHTML = `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" style="display:block;"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
   btn.style.marginLeft = 'auto';
   
   // Bind click
@@ -70,8 +69,10 @@ export function renderPinnedNoteInsideColumn(columnEl, dateStr) {
     
     pCard.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-weight:700; font-size:11px; color:#a78bfa;">📌 NOTE: ${title}</span>
-        <span style="font-size:10px;">✏️</span>
+        <span style="font-weight:700; font-size:11px; color:#a78bfa; display:inline-flex; align-items:center; gap:4px;">
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" style="transform: rotate(45deg); display:inline-block;"><line x1="18" y1="8" x2="22" y2="12"/><line x1="12" y1="2" x2="22" y2="12"/><path d="M12 2 2 12c.5 1.5 1.5 2.5 3 2.5L12 12l2.5 2.5-3.5 3.5 1 1c1.5.5 3 0 4-1l3.5-3.5 1.5 1.5-1.5-1.5z"/></svg> NOTE: ${title}
+        </span>
+        <span style="display:inline-flex; align-items:center;"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" style="display:block;"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
       </div>
       <div style="font-size:12px; font-style:italic; color:var(--text-secondary); margin-top:4px;">"${preview || 'Empty note content'}"</div>
     `;
@@ -160,11 +161,11 @@ function renderAttachmentsPreview(attachments) {
 function updatePinButtonState(isPinned) {
   const btn = document.getElementById('note-pin-btn');
   if (isPinned) {
-    btn.textContent = "📌 Pinned";
+    btn.textContent = "Pinned";
     btn.style.background = 'rgba(167, 139, 250, 0.15)';
     btn.style.borderColor = '#a78bfa';
   } else {
-    btn.textContent = "📌 Pin to Day";
+    btn.textContent = "Pin to Day";
     btn.style.background = 'none';
     btn.style.borderColor = 'var(--border-color)';
   }
@@ -210,7 +211,7 @@ function setupNotesEvents() {
     overlay.classList.add('hidden');
     document.body.classList.remove('notes-immersive-active');
     if (immersiveBtn) {
-      immersiveBtn.textContent = "🧘 Focus Writing";
+      immersiveBtn.textContent = "Focus Writing";
       immersiveBtn.classList.remove('active');
     }
     
@@ -227,7 +228,7 @@ function setupNotesEvents() {
         immersiveBtn.textContent = "Exit Focus Mode";
         immersiveBtn.classList.add('active');
       } else {
-        immersiveBtn.textContent = "🧘 Focus Writing";
+        immersiveBtn.textContent = "Focus Writing";
         immersiveBtn.classList.remove('active');
       }
     });
@@ -280,35 +281,35 @@ function setupNotesEvents() {
     let templateHtml = '';
     if (val === 'lecture') {
       templateHtml = `
-        <h1>📚 Lecture Notes: Topic</h1>
-        <h2>🔑 Core Concepts & Vocabulary</h2>
+        <h1>Lecture Notes: Topic</h1>
+        <h2>Core Concepts & Vocabulary</h2>
         <ul>
           <li>Concept A: Define</li>
           <li>Concept B: Define</li>
         </ul>
-        <h2>📝 Detailed Class Notes</h2>
+        <h2>Detailed Class Notes</h2>
         <p>Type core lecture arguments, slides notes, and definitions here...</p>
       `;
     } else if (val === 'problem') {
       templateHtml = `
-        <h1>✏️ Problem Set: Homework</h1>
-        <h2>❓ Problem Statement</h2>
+        <h1>Problem Set: Homework</h1>
+        <h2>Problem Statement</h2>
         <p>Type the equation, question text or prompt details...</p>
-        <h2>💡 Solution Strategy</h2>
+        <h2>Solution Strategy</h2>
         <p>1. Step details</p>
         <p>2. Step details</p>
-        <h2>✓ Final Answers & Check</h2>
+        <h2>Final Answers & Check</h2>
         <pre><code>x = 42</code></pre>
       `;
     } else if (val === 'journal') {
       templateHtml = `
-        <h1>📖 Reflections Daily Journal</h1>
-        <h2>🌟 Gratitude Checklist</h2>
+        <h1>Reflections Daily Journal</h1>
+        <h2>Gratitude Checklist</h2>
         <ul>
           <li>I am grateful for...</li>
           <li>I am grateful for...</li>
         </ul>
-        <h2>🧠 Daily learnings & study check</h2>
+        <h2>Daily learnings & study check</h2>
         <p>Reviewing focus cycles today, what did I complete? How can tomorrow be improved?</p>
       `;
     }
@@ -782,14 +783,16 @@ export function renderNotesLibrary() {
       
       card.innerHTML = `
         <div class="day-header" style="background: rgba(167,139,250,0.06); border-bottom-color: rgba(167,139,250,0.15);">
-          <div class="day-name" style="color:#a78bfa">📝 ${cardTitle}</div>
+          <div class="day-name" style="color:#a78bfa; display:flex; align-items:center; gap:6px;">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" style="display:block;"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> ${cardTitle}
+          </div>
           <div class="day-date">${formattedDate}</div>
         </div>
         <div style="padding: 14px; flex:1; display:flex; flex-direction:column; justify-content:space-between;">
           <p style="font-size:12px; color:var(--text-secondary); line-height:1.5; font-style:italic;">"${preview || 'Start typing to add content'}"</p>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; border-top:1px solid var(--border-color); padding-top:8px;">
             <span style="font-size:10px; color:var(--text-muted);">Attachments: ${note.attachments ? note.attachments.length : 0}</span>
-            <button class="btn-primary-sm open-lib-note" data-date="${dateStr}">Edit ✏️</button>
+            <button class="btn-primary-sm open-lib-note" data-date="${dateStr}">Edit</button>
           </div>
         </div>
       `;
@@ -1023,13 +1026,13 @@ function setupOCRScan() {
       fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file) {
-          showToast("Scanning image for text... 📷");
+          showToast("Scanning image for text...");
           setTimeout(() => {
             const editor = document.getElementById('editor-content-area');
-            const ocrText = `<p><strong>📷 Extracted Text (OCR Scan):</strong><br/>Planory Study Plan: Complete homework and practice mock exams.</p>`;
+            const ocrText = `<p><strong>Extracted Text (OCR Scan):</strong><br/>Planory Study Plan: Complete homework and practice mock exams.</p>`;
             editor.innerHTML += ocrText;
             saveActiveNote(false);
-            showToast("Text extracted successfully! 📝");
+            showToast("Text extracted successfully!");
           }, 1500);
         }
       });

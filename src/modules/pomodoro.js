@@ -19,6 +19,16 @@ export function initPomodoro() {
   updateStatsUI(stats);
   setupPomoEvents(stats);
   renderForestGarden();
+  
+  const seedPicker = document.getElementById('forest-seed-picker');
+  if (seedPicker) {
+    seedPicker.value = getStorageItem('forest_selected_seed', 'oak');
+    seedPicker.addEventListener('change', (e) => {
+      setStorageItem('forest_selected_seed', e.target.value);
+      updatePomoUI();
+      updateForestPageView();
+    });
+  }
 }
 
 function updatePomoUI() {
@@ -26,7 +36,7 @@ function updatePomoUI() {
   const secs = secondsRemaining % 60;
   document.getElementById('pomo-display').textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
-  document.getElementById('pomo-mode').textContent = mode === 'work' ? 'Work 🔴' : 'Break 🟢';
+  document.getElementById('pomo-mode').textContent = mode === 'work' ? 'Work Mode' : 'Break Mode';
 
   // Rounds bubbles
   let roundStr = "";
@@ -36,52 +46,46 @@ function updatePomoUI() {
   document.getElementById('pomo-rounds').textContent = roundStr;
 
   // Start/Pause Button content
-  document.getElementById('pomo-start-btn').textContent = isRunning ? '⏸ Pause' : '▶ Start';
+  document.getElementById('pomo-start-btn').textContent = isRunning ? 'Pause' : 'Start';
 
   // Task selection
   document.getElementById('pomo-task-label').textContent = activeTaskId ? `Focusing: ${activeTaskTitle}` : 'Ready for another focused session?';
 
   // Update Forest tree growth stages
-  const treeEmojiEl = document.getElementById('pomo-tree-emoji');
+  const treeContainer = document.getElementById('pomo-tree-container');
   const treeStatusEl = document.getElementById('pomo-tree-status');
-  if (treeEmojiEl && treeStatusEl) {
+  if (treeContainer && treeStatusEl) {
+    const selectedSeed = getStorageItem('forest_selected_seed', 'oak');
     if (mode === 'break') {
-      treeEmojiEl.textContent = '🌺';
+      treeContainer.innerHTML = getGrowingTreeSVG(selectedSeed, 100, true);
       treeStatusEl.textContent = 'Resting';
-      treeEmojiEl.style.transform = 'scale(1.1)';
+      treeContainer.style.transform = 'scale(1.1)';
     } else {
       if (secondsRemaining === 1500) {
-        treeEmojiEl.textContent = '🤎';
+        treeContainer.innerHTML = getGrowingTreeSVG(selectedSeed, 0, false);
         treeStatusEl.textContent = 'Planted';
-        treeEmojiEl.style.transform = 'scale(1)';
+        treeContainer.style.transform = 'scale(1)';
       } else {
         const elapsedPct = ((1500 - secondsRemaining) / 1500) * 100;
-        let emoji = '🤎';
         let status = 'Planted';
         let scale = 1;
         
         if (elapsedPct < 15) {
-          emoji = '🤎';
           status = 'Planted';
           scale = 1;
         } else if (elapsedPct < 35) {
-          emoji = '🌱';
           status = 'Sprouting';
           scale = 1.05;
         } else if (elapsedPct < 55) {
-          emoji = '🌿';
           status = 'Growing';
           scale = 1.1;
         } else if (elapsedPct < 75) {
-          emoji = '🪴';
           status = 'Healthy';
           scale = 1.15;
         } else if (elapsedPct < 95) {
-          emoji = '🌳';
           status = 'Maturing';
           scale = 1.2;
         } else {
-          emoji = '🌸';
           status = 'Blossoming';
           scale = 1.25;
         }
@@ -90,9 +94,9 @@ function updatePomoUI() {
           status += ' (Paused)';
         }
         
-        treeEmojiEl.textContent = emoji;
+        treeContainer.innerHTML = getGrowingTreeSVG(selectedSeed, elapsedPct, false);
         treeStatusEl.textContent = status;
-        treeEmojiEl.style.transform = `scale(${scale})`;
+        treeContainer.style.transform = `scale(${scale})`;
       }
     }
   }
@@ -104,7 +108,6 @@ function updateStatsUI(stats) {
 
   const focusVal = document.getElementById('stat-focus');
   if (focusVal) focusVal.textContent = `${h}h ${m}m`;
-
   const pomoStats = document.getElementById('pomo-stats');
   if (pomoStats) {
     pomoStats.innerHTML = `
@@ -120,6 +123,42 @@ function setupPomoEvents(stats) {
   const resetBtn = document.getElementById('pomo-reset-btn');
   const fullscreenBtn = document.getElementById('pomo-fullscreen-btn');
   const closeBtn = document.getElementById('pomodoro-modal-close-btn');
+
+  // Immersive Notes Elements
+  const notesToggleBtn = document.getElementById('pomo-notes-toggle-btn');
+  const notesPanel = document.getElementById('pomo-immersive-notes-panel');
+  const notesArrow = document.getElementById('pomo-notes-toggle-arrow');
+  const notesTextarea = document.getElementById('pomo-immersive-notes-textarea');
+  const saveStatus = document.getElementById('pomo-notes-save-status');
+
+  if (notesToggleBtn && notesPanel) {
+    notesToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      notesPanel.classList.toggle('hidden');
+      if (notesPanel.classList.contains('hidden')) {
+        notesPanel.style.right = '-320px';
+        notesToggleBtn.style.right = '0';
+        if (notesArrow) notesArrow.style.transform = 'rotate(180deg)';
+      } else {
+        notesPanel.style.right = '0';
+        notesToggleBtn.style.right = '320px';
+        if (notesArrow) notesArrow.style.transform = 'rotate(0deg)';
+        notesTextarea.focus();
+      }
+    });
+
+    // Load saved immersive notes
+    notesTextarea.value = getStorageItem('pomo_immersive_notes', '');
+
+    // Autosave on input
+    notesTextarea.addEventListener('input', () => {
+      saveStatus.textContent = 'Saving...';
+      setStorageItem('pomo_immersive_notes', notesTextarea.value);
+      setTimeout(() => {
+        saveStatus.textContent = 'Saved';
+      }, 500);
+    });
+  }
 
   startBtn.addEventListener('click', () => {
     if (isRunning) {
@@ -142,10 +181,19 @@ function setupPomoEvents(stats) {
   if (fullscreenBtn) {
     fullscreenBtn.addEventListener('click', () => {
       document.body.classList.toggle('pomo-immersive-active');
-      if (document.body.classList.contains('pomo-immersive-active')) {
-        fullscreenBtn.textContent = 'Exit Immersive 🧘';
+      const isImmersive = document.body.classList.contains('pomo-immersive-active');
+      if (isImmersive) {
+        fullscreenBtn.textContent = 'Exit Immersive';
+        if (notesToggleBtn) notesToggleBtn.classList.remove('hidden');
       } else {
-        fullscreenBtn.textContent = '🧘 Immersive Focus';
+        fullscreenBtn.textContent = 'Immersive Focus';
+        if (notesToggleBtn) notesToggleBtn.classList.add('hidden');
+        if (notesPanel) {
+          notesPanel.classList.add('hidden');
+          notesPanel.style.right = '-320px';
+        }
+        if (notesToggleBtn) notesToggleBtn.style.right = '0';
+        if (notesArrow) notesArrow.style.transform = 'rotate(180deg)';
       }
       updateBodySceneClass();
     });
@@ -154,7 +202,14 @@ function setupPomoEvents(stats) {
   if (closeBtn) {
     closeBtn.addEventListener('click', () => {
       document.body.classList.remove('pomo-immersive-active');
-      if (fullscreenBtn) fullscreenBtn.textContent = '🧘 Immersive Focus';
+      if (fullscreenBtn) fullscreenBtn.textContent = 'Immersive Focus';
+      if (notesToggleBtn) notesToggleBtn.classList.add('hidden');
+      if (notesPanel) {
+        notesPanel.classList.add('hidden');
+        notesPanel.style.right = '-320px';
+      }
+      if (notesToggleBtn) notesToggleBtn.style.right = '0';
+      if (notesArrow) notesArrow.style.transform = 'rotate(180deg)';
       updateBodySceneClass();
     });
   }
@@ -163,7 +218,14 @@ function setupPomoEvents(stats) {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && document.body.classList.contains('pomo-immersive-active')) {
       document.body.classList.remove('pomo-immersive-active');
-      if (fullscreenBtn) fullscreenBtn.textContent = '🧘 Immersive Focus';
+      if (fullscreenBtn) fullscreenBtn.textContent = 'Immersive Focus';
+      if (notesToggleBtn) notesToggleBtn.classList.add('hidden');
+      if (notesPanel) {
+        notesPanel.classList.add('hidden');
+        notesPanel.style.right = '-320px';
+      }
+      if (notesToggleBtn) notesToggleBtn.style.right = '0';
+      if (notesArrow) notesArrow.style.transform = 'rotate(180deg)';
       updateBodySceneClass();
     }
   });
@@ -225,7 +287,7 @@ function pauseTimer() {
 function resetTimer() {
   if (mode === 'work' && secondsRemaining < 1500) {
     const forest = getStorageItem('pomo_forest', []);
-    forest.push('🪵');
+    forest.push('dead');
     setStorageItem('pomo_forest', forest);
     setStorageItem('forest_growth_progress', 0);
     renderForestGarden();
@@ -258,7 +320,7 @@ export function setFocusTask(taskId, taskTitle) {
   updatePomoUI();
 
   const toast = document.getElementById('notif-toast');
-  document.getElementById('notif-msg').textContent = `Focused on: "${taskTitle}" 🍅`;
+  document.getElementById('notif-msg').textContent = 'Focused on: "' + taskTitle + '"';
   toast.classList.remove('hidden');
   setTimeout(() => toast.classList.add('hidden'), 2500);
 }
@@ -390,7 +452,7 @@ function selectFocusScene(scene) {
 function updateBodySceneClass() {
   document.body.classList.remove('scene-rain', 'scene-midnight', 'scene-library', 'scene-sprint', 'scene-morning');
   if (document.body.classList.contains('pomo-immersive-active')) {
-    document.body.classList.add(`scene-${currentScene}`);
+    document.body.classList.add('scene-' + currentScene);
     createFocusParticles();
   }
 }
@@ -500,21 +562,22 @@ export function renderForestGarden() {
   const recent = forest.slice(-24);
   recent.forEach(tree => {
     const item = document.createElement('span');
-    item.textContent = tree;
-    item.style.filter = tree === '🪵' ? 'grayscale(0.6)' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))';
-    item.title = tree === '🪵' ? 'Failed focus session' : 'Successful focus session';
+    item.innerHTML = getTreeSVG(tree, 20);
+    item.style.filter = (tree === 'dead' || tree === '🪵') ? 'grayscale(0.6)' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))';
+    item.title = (tree === 'dead' || tree === '🪵') ? 'Failed focus session' : 'Grown from focus & tasks';
     grid.appendChild(item);
   });
 }
 
 const FOREST_STAGES = [
-  { minPct: 0, emoji: '🤎', name: 'Planted Seed' },
-  { minPct: 15, emoji: '🌱', name: 'Sprouting' },
-  { minPct: 35, emoji: '🌿', name: 'Growing Sapling' },
-  { minPct: 55, emoji: '🪴', name: 'Healthy Potted Plant' },
-  { minPct: 75, emoji: '🌳', name: 'Maturing Tree' },
-  { minPct: 95, emoji: '🌸', name: 'Blossoming Cherry Tree' }
+  { minPct: 0, name: 'Planted Seed' },
+  { minPct: 15, name: 'Sprouting' },
+  { minPct: 35, name: 'Growing Sapling' },
+  { minPct: 55, name: 'Healthy Potted Plant' },
+  { minPct: 75, name: 'Maturing Tree' },
+  { minPct: 95, name: 'Blossoming Cherry Tree' }
 ];
+
 
 function showPomoToast(msg) {
   const toast = document.getElementById('notif-toast');
@@ -532,16 +595,15 @@ export function addForestGrowth(pct) {
     progress = Math.min(100, Math.max(0, progress + pct));
     
     if (progress >= 100) {
-      const trees = ['🌳', '🌸', '🌲', '🌴', '🍁', '🍂', '🎄'];
-      const chosenTree = trees[Math.floor(Math.random() * trees.length)];
+      const selectedSeed = getStorageItem('forest_selected_seed', 'oak');
       const forest = getStorageItem('pomo_forest', []);
-      forest.push(chosenTree);
+      forest.push(selectedSeed);
       setStorageItem('pomo_forest', forest);
       
       triggerConfettiCelebration();
       
       progress = 0;
-      showPomoToast(`Your plant fully blossomed into a ${chosenTree}! 🌲`);
+      showPomoToast(`Your plant fully blossomed into a ${selectedSeed.toUpperCase()} tree!`);
     }
     
     setStorageItem('forest_growth_progress', progress);
@@ -557,8 +619,9 @@ export function updateForestPageView() {
   try {
     const progress = getStorageItem('forest_growth_progress', 0);
     const forest = getStorageItem('pomo_forest', []);
+    const selectedSeed = getStorageItem('forest_selected_seed', 'oak');
     
-    const emojiEl = document.getElementById('forest-main-plant-emoji');
+    const mainPlantContainer = document.getElementById('forest-main-plant-container');
     const stageEl = document.getElementById('forest-growth-stage');
     const pctEl = document.getElementById('forest-growth-pct');
     const fillEl = document.getElementById('forest-growth-fill');
@@ -569,22 +632,22 @@ export function updateForestPageView() {
       badgeCountEl.textContent = `${forest.length} Tree${forest.length === 1 ? '' : 's'} grown`;
     }
     
-    let currentStage = FOREST_STAGES[0];
-    for (let i = FOREST_STAGES.length - 1; i >= 0; i--) {
-      if (progress >= FOREST_STAGES[i].minPct) {
-        currentStage = FOREST_STAGES[i];
-        break;
-      }
-    }
+    let currentStageName = 'Planted';
+    if (progress < 15) currentStageName = 'Planted';
+    else if (progress < 35) currentStageName = 'Sprouting';
+    else if (progress < 55) currentStageName = 'Growing';
+    else if (progress < 75) currentStageName = 'Healthy';
+    else if (progress < 95) currentStageName = 'Maturing';
+    else currentStageName = 'Blossoming';
     
-    if (emojiEl) {
-      emojiEl.textContent = currentStage.emoji;
+    if (mainPlantContainer) {
+      mainPlantContainer.innerHTML = getGrowingTreeSVG(selectedSeed, progress, false);
       const scale = 1 + (progress % 20) * 0.01;
-      emojiEl.style.transform = `scale(${scale})`;
+      mainPlantContainer.style.transform = `scale(${scale})`;
     }
     
     if (stageEl) {
-      stageEl.textContent = currentStage.name;
+      stageEl.textContent = currentStageName;
     }
     
     if (pctEl) {
@@ -595,6 +658,39 @@ export function updateForestPageView() {
       fillEl.style.width = `${progress}%`;
     }
     
+    // Render the weather particles overlay
+    const weatherOverlay = document.getElementById('forest-weather-overlay');
+    if (weatherOverlay) {
+      weatherOverlay.innerHTML = '';
+      let particleCount = 0;
+      let particleClass = '';
+      
+      if (currentScene === 'rain') {
+        particleCount = 40;
+        particleClass = 'rain-drop';
+      } else if (currentScene === 'midnight') {
+        particleCount = 25;
+        particleClass = 'star-particle';
+      } else if (currentScene === 'sprint') {
+        particleCount = 20;
+        particleClass = 'spark-particle';
+      } else if (currentScene === 'morning') {
+        particleCount = 15;
+        particleClass = 'morning-drifter';
+      }
+      
+      for (let i = 0; i < particleCount; i++) {
+        const p = document.createElement('div');
+        p.className = `weather-particle ${particleClass}`;
+        p.style.left = `${Math.random() * 100}%`;
+        p.style.top = `${Math.random() * -10}%`;
+        p.style.animationDelay = `${Math.random() * 6}s`;
+        p.style.animationDuration = `${3 + Math.random() * 5}s`;
+        p.style.opacity = `${0.3 + Math.random() * 0.7}`;
+        weatherOverlay.appendChild(p);
+      }
+    }
+    
     if (gardenGridEl) {
       gardenGridEl.innerHTML = '';
       if (forest.length === 0) {
@@ -602,14 +698,126 @@ export function updateForestPageView() {
       } else {
         forest.forEach(tree => {
           const item = document.createElement('span');
-          item.textContent = tree;
-          item.style.filter = tree === '🪵' ? 'grayscale(0.6)' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))';
-          item.title = tree === '🪵' ? 'Failed focus session' : 'Grown from focus & tasks';
+          item.innerHTML = getTreeSVG(tree, 28);
+          item.style.filter = (tree === 'dead' || tree === '🪵') ? 'grayscale(0.6)' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))';
+          item.title = (tree === 'dead' || tree === '🪵') ? 'Failed focus session' : 'Grown from focus & tasks';
           gardenGridEl.appendChild(item);
         });
       }
     }
   } catch (err) {
     console.error("Error in updateForestPageView:", err);
+  }
+}
+
+// Minimal vector tree SVGs
+export function getTreeSVG(treeType, size = 24) {
+  let color = '#34d399';
+  let path = '';
+  const type = (treeType || '').toLowerCase();
+  
+  if (type === 'dead' || type === '🪵') {
+    color = '#6b7280';
+    path = `<rect x="10" y="14" width="4" height="8" rx="1" fill="${color}" />
+            <path d="M7 16h10" stroke="${color}" stroke-width="1.5" stroke-linecap="round" />`;
+  } else if (type === 'sakura' || type === '🌸') {
+    color = '#f472b6';
+    path = `<rect x="11" y="15" width="2" height="7" rx="0.5" fill="#78350f" />
+            <circle cx="12" cy="10" r="6" fill="${color}" opacity="0.9" />
+            <circle cx="9" cy="12" r="4" fill="${color}" opacity="0.85" />
+            <circle cx="15" cy="12" r="4" fill="${color}" opacity="0.85" />`;
+  } else if (type === 'maple' || type === '🍁') {
+    color = '#f97316';
+    path = `<rect x="11" y="15" width="2" height="7" rx="0.5" fill="#78350f" />
+            <path d="M12 4L6 14h12Z" fill="${color}" />
+            <path d="M12 8L8 16h8Z" fill="${color}" opacity="0.9" />`;
+  } else if (type === 'pine' || type === '🌲') {
+    color = '#065f46';
+    path = `<rect x="11" y="16" width="2" height="6" rx="0.5" fill="#78350f" />
+            <path d="M12 3L7 11h10Z" fill="${color}" />
+            <path d="M12 8L6 17h12Z" fill="${color}" opacity="0.9" />`;
+  } else if (type === 'palm' || type === '🌴') {
+    color = '#10b981';
+    path = `<path d="M12 22c0-8-2-12-5-14" stroke="#78350f" stroke-width="2" stroke-linecap="round" fill="none" />
+            <path d="M7 8c3-2 6-2 9 0" stroke="${color}" stroke-width="2" stroke-linecap="round" fill="none" />
+            <path d="M7 8c1-3 3-5 5-5" stroke="${color}" stroke-width="1.5" stroke-linecap="round" fill="none" />
+            <path d="M7 8c-2 2-4 4-5 6" stroke="${color}" stroke-width="1.5" stroke-linecap="round" fill="none" />`;
+  } else {
+    color = '#059669';
+    path = `<rect x="11" y="15" width="2" height="7" rx="0.5" fill="#78350f" />
+            <circle cx="12" cy="9" r="6" fill="${color}" />
+            <circle cx="8" cy="11" r="5" fill="${color}" opacity="0.9" />
+            <circle cx="16" cy="11" r="5" fill="${color}" opacity="0.9" />`;
+  }
+  
+  return `
+    <svg viewBox="0 0 24 24" width="${size}" height="${size}" style="display: block; overflow: visible;">
+      ${path}
+    </svg>
+  `;
+}
+
+export function getGrowingTreeSVG(seedType, progressPct, isResting) {
+  if (isResting) {
+    return getTreeSVG(seedType, 52);
+  }
+
+  let color = '#34d399';
+  const type = (seedType || '').toLowerCase();
+  if (type === 'sakura') color = '#f472b6';
+  else if (type === 'maple') color = '#f97316';
+  else if (type === 'pine') color = '#065f46';
+  else if (type === 'palm') color = '#10b981';
+  else color = '#059669';
+
+  if (progressPct < 15) {
+    // Seed
+    return `
+      <svg viewBox="0 0 24 24" width="36" height="36" style="display: block; overflow: visible;">
+        <circle cx="12" cy="18" r="3" fill="#78350f" />
+        <rect x="9" y="17" width="6" height="4" fill="#4b5563" rx="1" />
+      </svg>
+    `;
+  } else if (progressPct < 35) {
+    // Sprout
+    return `
+      <svg viewBox="0 0 24 24" width="40" height="40" style="display: block; overflow: visible;">
+        <path d="M12 20v-5M12 15c-1-2-3-2-4-2.5M12 16c2-1 3.5-2.5 3-4" stroke="#34d399" stroke-width="2" stroke-linecap="round" fill="none" />
+        <rect x="9" y="19" width="6" height="2" fill="#4b5563" rx="0.5" />
+      </svg>
+    `;
+  } else if (progressPct < 55) {
+    // Sapling
+    return `
+      <svg viewBox="0 0 24 24" width="44" height="44" style="display: block; overflow: visible;">
+        <path d="M12 20v-8M12 15c-1.5-1.5-3-1.5-4.5-1M12 13c1.5-1.5 3-1.5 4.5-1" stroke="#78350f" stroke-width="2" stroke-linecap="round" fill="none" />
+        <circle cx="7" cy="13" r="2.5" fill="${color}" />
+        <circle cx="17" cy="11" r="2.5" fill="${color}" />
+        <circle cx="12" cy="10" r="3.5" fill="${color}" />
+      </svg>
+    `;
+  } else if (progressPct < 75) {
+    // Shrub
+    return `
+      <svg viewBox="0 0 24 24" width="48" height="48" style="display: block; overflow: visible;">
+        <rect x="11" y="14" width="2" height="7" rx="0.5" fill="#78350f" />
+        <circle cx="12" cy="9" r="5" fill="${color}" />
+        <circle cx="9" cy="11" r="4" fill="${color}" opacity="0.9" />
+        <circle cx="15" cy="11" r="4" fill="${color}" opacity="0.9" />
+      </svg>
+    `;
+  } else if (progressPct < 95) {
+    // Maturing
+    return `
+      <svg viewBox="0 0 24 24" width="50" height="50" style="display: block; overflow: visible;">
+        <rect x="11" y="13" width="2" height="8" rx="0.5" fill="#78350f" />
+        <circle cx="12" cy="8" r="6" fill="${color}" />
+        <circle cx="8" cy="10" r="5" fill="${color}" opacity="0.9" />
+        <circle cx="16" cy="10" r="5" fill="${color}" opacity="0.9" />
+      </svg>
+    `;
+  } else {
+    // Blossoming / Fully Grown
+    return getTreeSVG(seedType, 52);
   }
 }

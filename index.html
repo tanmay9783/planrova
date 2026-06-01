@@ -40,17 +40,17 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Pick an Avatar</label>
+          <label>Pick an Avatar Shape</label>
           <div class="avatar-picker" id="avatar-picker">
-            <span class="avatar-opt selected" data-avatar="🦁">🦁</span>
-            <span class="avatar-opt" data-avatar="🐯">🐯</span>
-            <span class="avatar-opt" data-avatar="🦊">🦊</span>
-            <span class="avatar-opt" data-avatar="🐺">🐺</span>
-            <span class="avatar-opt" data-avatar="🦅">🦅</span>
-            <span class="avatar-opt" data-avatar="🐉">🐉</span>
-            <span class="avatar-opt" data-avatar="🌙">🌙</span>
-            <span class="avatar-opt" data-avatar="⚡">⚡</span>
-            <span class="avatar-opt" data-avatar="🔥">🔥</span>
+            <span class="avatar-opt selected" data-avatar="⬡">⬡</span>
+            <span class="avatar-opt" data-avatar="✦">✦</span>
+            <span class="avatar-opt" data-avatar="◆">◆</span>
+            <span class="avatar-opt" data-avatar="●">●</span>
+            <span class="avatar-opt" data-avatar="■">■</span>
+            <span class="avatar-opt" data-avatar="▲">▲</span>
+            <span class="avatar-opt" data-avatar="▼">▼</span>
+            <span class="avatar-opt" data-avatar="★">★</span>
+            <span class="avatar-opt" data-avatar="⬢">⬢</span>
           </div>
         </div>
         <button class="btn-primary" id="onboarding-save">Let's Go →</button>
@@ -67,14 +67,18 @@
               <circle cx="50" cy="50" r="44" stroke="rgba(255,255,255,0.03)" stroke-width="4" fill="none"></circle>
               <circle cx="50" cy="50" r="44" stroke="var(--accent)" stroke-width="4" fill="none" stroke-dasharray="276" stroke-dashoffset="276" id="avatar-ring-fill" stroke-linecap="round"></circle>
             </svg>
-            <div class="profile-avatar" id="profile-avatar-display">🦁</div>
+            <div class="profile-avatar" id="profile-avatar-display" style="font-size: 14px; font-weight: 700;">⬡</div>
           </div>
           <div class="profile-info" style="flex:1;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <span class="profile-name" id="profile-name-display">Tanmay</span>
               <div style="display:flex; gap:6px;" class="profile-actions">
-                <button class="icon-btn" id="auth-login-btn" title="Enable Cloud Sync" style="font-size:12px; color:var(--text-muted);">☁️ Off</button>
-                <button class="icon-btn" id="edit-profile-btn" title="Edit Profile" style="font-size:12px; opacity:0.6;">✏️</button>
+                <button class="icon-btn" id="auth-login-btn" title="Enable Cloud Sync" style="font-size:11px; color:var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
+                  <span class="auth-dot" style="width: 6px; height: 6px; background: var(--text-muted); border-radius: 50%; display: inline-block;"></span>Off
+                </button>
+                <button class="icon-btn" id="edit-profile-btn" title="Edit Profile" style="opacity:0.6; display: flex; align-items: center; justify-content: center;">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4z"/></svg>
+                </button>
               </div>
             </div>
             <div class="profile-bio" id="profile-bio-display">Builder</div>
@@ -106,7 +110,9 @@
         </div>
         <div id="streak-pet-section" class="sidebar-section-body" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
           <div class="streak-card">
-            <div class="streak-flame">🔥</div>
+            <div class="streak-flame" style="display:flex; align-items:center; justify-content:center;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+            </div>
             <div class="streak-info">
               <div class="streak-count" id="streak-count">0</div>
               <div class="streak-label">Day Streak</div>
@@ -135,9 +141,9 @@
               <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                   <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Daily Score</span>
-                  <div id="virtual-pet-container" style="font-size: 22px; filter: drop-shadow(0 0 8px rgba(186,117,23,0.4)); animation: floatFlame 3s ease-in-out infinite alternate; cursor: pointer;" title="Your Focus Pet. Complete tasks to grow it!">🌱</div>
+                  <div id="virtual-pet-container" style="width: 32px; height: 32px; filter: drop-shadow(0 0 8px rgba(186,117,23,0.4)); cursor: pointer; display: flex; align-items: center; justify-content: center;" title="Your Focus Core. Complete tasks to power it!"></div>
                 </div>
-                <div class="helper-text" id="pet-status-msg" style="font-size: 11px; line-height: 1.3; color: var(--text-secondary);">Your plant is sprouting! Add tasks and focus to grow it.</div>
+                <div class="helper-text" id="pet-status-msg" style="font-size: 11px; line-height: 1.3; color: var(--text-secondary);">Focus Core is booting up...</div>
               </div>
             </div>
           </div>
@@ -148,23 +154,23 @@
       <div class="sidebar-section">
         <nav class="sidebar-nav" style="display:flex; flex-direction: column; gap: 4px;">
           <button class="nav-item active" id="view-weekly-btn" style="text-align: left; padding: 10px 14px; display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; border-radius:8px;">
-            <span class="nav-icon" style="font-size:16px;">🏠</span>
+            <span class="nav-icon" style="display: flex; align-items: center; justify-content: center;"><svg class="nav-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
             <span class="nav-text">Home Timetable</span>
           </button>
           <button class="nav-item" id="view-calendar-btn" style="text-align: left; padding: 10px 14px; display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; border-radius:8px;">
-            <span class="nav-icon" style="font-size:16px;">📅</span>
+            <span class="nav-icon" style="display: flex; align-items: center; justify-content: center;"><svg class="nav-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg></span>
             <span class="nav-text">Month Calendar</span>
           </button>
           <button class="nav-item" id="sidebar-nav-notes" style="text-align: left; padding: 10px 14px; display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; border-radius:8px;">
-            <span class="nav-icon" style="font-size:16px;">📝</span>
+            <span class="nav-icon" style="display: flex; align-items: center; justify-content: center;"><svg class="nav-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></span>
             <span class="nav-text">Subject Notes</span>
           </button>
           <button class="nav-item" id="sidebar-nav-timer" style="text-align: left; padding: 10px 14px; display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; border-radius:8px;">
-            <span class="nav-icon" style="font-size:16px;">⏱️</span>
+            <span class="nav-icon" style="display: flex; align-items: center; justify-content: center;"><svg class="nav-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
             <span class="nav-text">Focus Timer</span>
           </button>
           <button class="nav-item" id="sidebar-nav-forest" style="text-align: left; padding: 10px 14px; display:flex; align-items:center; gap:10px; font-size:13px; font-weight:500; border-radius:8px;">
-            <span class="nav-icon" style="font-size:16px;">🌲</span>
+            <span class="nav-icon" style="display: flex; align-items: center; justify-content: center;"><svg class="nav-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-5 2-1-5-4 5-1-3-4 8-3 8 3-3 4 5 1-5 4 2 1-7 5z"/><path d="M12 19v3"/></svg></span>
             <span class="nav-text">Focus Forest</span>
           </button>
         </nav>
@@ -237,10 +243,12 @@
 
         <div class="top-bar-right">
           <!-- Search button for Command Palette (indicates Ctrl+K) -->
-          <button class="icon-btn" id="global-search-btn" title="Search Workspace (Ctrl+K)" style="font-size: 15px; margin-right: 12px; opacity: 0.65; display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.03); padding:6px 12px; border-radius:8px; border:1px solid var(--border-color);">
-            <span>🔍</span> <span style="font-size:11px; color:var(--text-secondary);">Search (Ctrl+K)</span>
+          <button class="icon-btn" id="global-search-btn" title="Search Workspace (Ctrl+K)" style="margin-right: 12px; opacity: 0.65; display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.03); padding:6px 12px; border-radius:8px; border:1px solid var(--border-color);">
+            <span style="display:flex; align-items:center; justify-content:center;"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg></span> <span style="font-size:11px; color:var(--text-secondary);">Search (Ctrl+K)</span>
           </button>
-          <button class="icon-btn" id="theme-toggle-btn" title="Toggle Theme" style="font-size: 16px; margin-right: 8px; opacity: 0.65;">🌓</button>
+          <button class="icon-btn" id="theme-toggle-btn" title="Toggle Theme" style="margin-right: 8px; opacity: 0.65; display: flex; align-items: center; justify-content: center;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2v20"/></svg>
+          </button>
           <button class="icon-btn" id="zen-mode-btn" title="Zen Mode" style="font-size: 14px; margin-right: 12px; opacity: 0.65;">Zen</button>
           <button class="btn-voice" id="global-voice-btn" title="Voice add task" style="font-size: 14px;">◉</button>
           <div class="week-nav">
@@ -259,14 +267,14 @@
           <!-- Level and Streak Row -->
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:20px;">🎖️</span>
+              <span style="display:flex; align-items:center; justify-content:center; color:var(--accent);"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg></span>
               <div style="display:flex; flex-direction:column;">
                 <span id="mobile-level-display" style="font-weight:700; font-size:12px; color:var(--accent);">Level 1</span>
                 <span id="mobile-xp-display" style="font-size:10px; color:var(--text-secondary);">0 / 100 XP</span>
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.03); padding:4px 10px; border-radius:12px; border:1px solid var(--border-color);">
-              <span>🔥</span>
+              <span style="display:flex; align-items:center; justify-content:center; color:var(--accent);"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></span>
               <span id="mobile-streak-display" style="font-size:11px; font-weight:700;">0</span>
             </div>
           </div>
@@ -274,17 +282,17 @@
           <!-- Water & Daily Score Row -->
           <div style="display:flex; gap:12px;">
             <div class="mobile-stat-pill" style="flex:1; display:flex; align-items:center; gap:8px; background:var(--bg-card); border:1px solid var(--border-color); padding:10px 14px; border-radius:12px;">
-              <span style="font-size:18px;">💧</span>
+              <span style="display:flex; align-items:center; justify-content:center; color:#789ed4;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg></span>
               <div style="display:flex; flex-direction:column;">
                 <span id="mobile-water-volume" style="font-size:12px; font-weight:700;">0 / 2000 ml</span>
                 <span id="mobile-water-pct" style="font-size:9px; color:var(--text-secondary);">0% complete</span>
               </div>
             </div>
             <div class="mobile-stat-pill" style="flex:1; display:flex; align-items:center; gap:8px; background:var(--bg-card); border:1px solid var(--border-color); padding:10px 14px; border-radius:12px;">
-              <span id="mobile-pet-emoji" style="font-size:18px;">🌱</span>
+              <span id="mobile-pet-emoji" style="width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 0 4px rgba(186,117,23,0.4));"></span>
               <div style="display:flex; flex-direction:column;">
                 <span id="mobile-score-letter" style="font-size:12px; font-weight:700;">F Score</span>
-                <span style="font-size:9px; color:var(--text-secondary);">Plant is sprouting</span>
+                <span id="mobile-pet-status" style="font-size:9px; color:var(--text-secondary);">Core is booting up</span>
               </div>
             </div>
           </div>
@@ -323,20 +331,35 @@
       <!-- Dedicated Focus Forest page view -->
       <div class="monthly-calendar-container hidden" id="forest-garden-view" style="padding: 24px; display: flex; flex-direction: column; gap: 24px;">
         <div class="calendar-header-bar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0; border-bottom: none; padding-bottom: 0;">
-          <h2 style="font-family: var(--font-display); background: linear-gradient(135deg, #fff, #BA7517); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">🌲 Focus Forest Garden</h2>
+          <h2 style="font-family: var(--font-display); background: linear-gradient(135deg, #fff, #BA7517); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">Focus Forest Garden</h2>
           <span style="font-size:12px; color:var(--text-secondary); background:rgba(186,117,23,0.1); padding:4px 12px; border-radius:12px; font-weight:700; border:1px solid rgba(186,117,23,0.2);" id="forest-badge-count">0 Trees grown</span>
         </div>
 
         <!-- Ecosystem Center Card -->
-        <div class="budget-card" style="padding: 30px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 20px; background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: var(--radius-lg); position: relative; overflow: hidden; min-height: 280px; justify-content: center; margin-top: 10px;">
-          <div style="font-size: 84px; filter: drop-shadow(0 0 16px rgba(186,117,23,0.45)); transform-origin: bottom center; transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); display:inline-block;" id="forest-main-plant-emoji">🤎</div>
-          <div style="display:flex; flex-direction:column; gap:4px;">
+        <div class="budget-card" style="padding: 30px; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 20px; background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: var(--radius-lg); position: relative; overflow: hidden; min-height: 300px; justify-content: center; margin-top: 10px;">
+          <!-- Weather Particle Overlay -->
+          <div id="forest-weather-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></div>
+          
+          <div id="forest-main-plant-container" style="width: 100px; height: 100px; display: inline-flex; align-items: center; justify-content: center; filter: drop-shadow(0 0 16px rgba(186,117,23,0.45)); transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 2;"></div>
+          <div style="display:flex; flex-direction:column; gap:4px; z-index: 2;">
             <h3 id="forest-plant-title" style="font-size: 18px; font-weight: 800; color: #fff; margin: 0;">Your Focus Tree</h3>
             <p id="forest-plant-desc" style="font-size: 13px; color: var(--text-secondary); max-width: 420px; line-height: 1.4; margin: 8px auto 0 auto;">This tree grows as you accumulate Pomodoro focus sessions (+100%) and complete your tasks (+20%). Grind hard to grow a lush forest!</p>
           </div>
 
+          <!-- Seed Picker Selector -->
+          <div style="display: flex; align-items: center; gap: 8px; z-index: 2; margin-top: 4px;">
+            <label for="forest-seed-picker" style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">Select Seed:</label>
+            <select id="forest-seed-picker" style="padding: 4px 10px; font-size: 12px; border-radius: 6px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: #fff; cursor: pointer;">
+              <option value="oak">Oak Tree</option>
+              <option value="sakura">Sakura Blossom</option>
+              <option value="maple">Red Maple</option>
+              <option value="pine">Pine Tree</option>
+              <option value="palm">Palm Tree</option>
+            </select>
+          </div>
+
           <!-- Growth Progress Indicator -->
-          <div style="width: 100%; max-width: 380px; margin: 0 auto;">
+          <div style="width: 100%; max-width: 380px; margin: 0 auto; z-index: 2;">
             <div style="display:flex; justify-content:space-between; font-size:11px; font-weight:700; color:var(--text-secondary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.05em;">
               <span id="forest-growth-stage">Planted</span>
               <span id="forest-growth-pct">0% Grow Progress</span>
@@ -349,7 +372,7 @@
 
         <!-- My Garden Grid -->
         <h3 style="font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 10px; margin-bottom: 0; display:flex; align-items:center; gap:6px;">
-          <span>🏡</span> My Focus Forest Grid
+          My Focus Forest Grid
         </h3>
         <div class="budget-card" style="padding: 24px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
           <div id="forest-page-garden-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 10px; justify-items: center; align-content: center; font-size: 28px; min-height: 80px;">
@@ -463,14 +486,14 @@
             <button class="toolbar-btn" data-cmd="formatBlock" data-val="h3" title="Heading 3">H3</button>
             <button class="toolbar-btn" data-cmd="insertUnorderedList" title="Bullet List">• List</button>
             <button class="toolbar-btn" data-cmd="insertOrderedList" title="Numbered List">1. List</button>
-            <button class="toolbar-btn" data-cmd="hiliteColor" title="Highlight text">🖍️</button>
+            <button class="toolbar-btn" data-cmd="hiliteColor" title="Highlight text"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m14 15-4-4"/><path d="m17 8-9 9"/></svg></button>
             
             <!-- Note Templates -->
             <select id="editor-template-picker" style="padding: 2px 6px; font-size:11px; margin-left:auto; border-radius:4px; background: rgba(255,255,255,0.05);" title="Load structure">
               <option value="">Choose Template</option>
-              <option value="lecture">Lecture Notes 📚</option>
-              <option value="problem">Problem Set ✏️</option>
-              <option value="journal">Daily Journal 📖</option>
+              <option value="lecture">Lecture Notes</option>
+              <option value="problem">Problem Set</option>
+              <option value="journal">Daily Journal</option>
             </select>
           </div>
 
@@ -486,19 +509,19 @@
 
           <!-- Sketch & Image Uploader -->
           <div class="editor-file-drop" id="editor-file-drop" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; border:1px dashed var(--border-color); border-radius:8px; margin-bottom:12px; cursor:pointer;">
-            <span style="font-size: 11px; color: var(--text-secondary);">📎 Drag & Drop slide screenshots/diagrams</span>
-            <button class="btn-ghost" id="note-ocr-scan-btn" style="padding: 4px 10px; font-size: 11px; border-radius: 6px;" type="button">📷 Scan Image</button>
+            <span style="font-size: 11px; color: var(--text-secondary); display:inline-flex; align-items:center; gap:4px;"><svg class="task-svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Drag & Drop slide screenshots/diagrams</span>
+            <button class="btn-ghost" id="note-ocr-scan-btn" style="padding: 4px 10px; font-size: 11px; border-radius: 6px; display:inline-flex; align-items:center;" type="button"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Scan Image</button>
             <input type="file" id="note-file-input" class="hidden" accept="image/*" />
           </div>
           <div id="note-attachments-preview" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;"></div>
-
+          
           <!-- Interactive Editor Area -->
           <div class="editor-area" contenteditable="true" id="editor-content-area" placeholder="Start typing your second brain here..."></div>
 
           <!-- AI Floating/Fixed Action Row -->
           <div style="display:flex; gap:8px; margin-top:16px;">
-            <button class="btn-ghost" id="ai-summarise-btn" style="flex:1; font-size:12px; padding:8px 12px;">🤖 AI Summarise</button>
-            <button class="btn-ghost" id="ai-flashcards-btn" style="flex:1; font-size:12px; padding:8px 12px;">🃏 Make Flashcards</button>
+            <button class="btn-ghost" id="ai-summarise-btn" style="flex:1; font-size:12px; padding:8px 12px;">AI Summarise</button>
+            <button class="btn-ghost" id="ai-flashcards-btn" style="flex:1; font-size:12px; padding:8px 12px;">Make Flashcards</button>
           </div>
           
           <!-- AI Outputs display area -->
@@ -556,11 +579,11 @@
     </div>
   </div>
 
-  <!-- Dedicated Full Water Hydration Dashboard Modal -->
+  <!-- Dedicated Full Water Hydration Workspace Modal -->
   <div class="modal-overlay hidden" id="water-modal-overlay">
     <div class="modal wide-modal" id="water-modal">
       <div class="modal-header">
-        <h2>💧 Water Hydration Workspace</h2>
+        <h2>Water Hydration Workspace</h2>
         <button class="modal-close" id="water-modal-close-btn">×</button>
       </div>
       <div class="modal-body settings-body" style="padding: 24px;">
@@ -580,7 +603,7 @@
                 </defs>
               </svg>
               <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2;">
-                <span style="font-size: 28px;">💧</span>
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" style="color:#789ed4; display:block;"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
                 <span id="water-widget-pct-large" style="font-size: 20px; font-weight: 800; font-family: var(--font-display); margin-top: 4px; color: var(--text-primary);">0%</span>
               </div>
             </div>
@@ -588,14 +611,23 @@
           </div>
 
           <h3>Log Preset Beverages</h3>
-          <div class="presets-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <button class="btn-ghost log-water-preset" data-ml="250" style="padding: 8px 12px; font-size: 12px;">💧 Water (250ml)</button>
-            <button class="btn-ghost log-water-preset" data-ml="150" style="padding: 8px 12px; font-size: 12px;">🥛 Small Glass (150ml)</button>
-            <button class="btn-ghost log-water-preset" data-ml="500" style="padding: 8px 12px; font-size: 12px;">🥤 Bottle (500ml)</button>
-            <button class="btn-ghost log-water-preset" data-ml="-100" style="padding: 8px 12px; font-size: 12px; border-color: rgba(239,68,68,0.2); color: #f87171;">☕ Coffee (-100ml)</button>
+          <div class="presets-grid" id="water-presets-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button class="btn-ghost log-water-preset" data-ml="250" style="padding: 8px 12px; font-size: 12px;">Water (250ml)</button>
+            <button class="btn-ghost log-water-preset" data-ml="150" style="padding: 8px 12px; font-size: 12px;">Small Glass (150ml)</button>
+            <button class="btn-ghost log-water-preset" data-ml="500" style="padding: 8px 12px; font-size: 12px;">Bottle (500ml)</button>
+            <button class="btn-ghost log-water-preset" data-ml="-100" style="padding: 8px 12px; font-size: 12px; border-color: rgba(239,68,68,0.2); color: #f87171;">Coffee (-100ml)</button>
           </div>
 
-          <div style="display:flex; align-items:center; gap:8px;">
+          <div style="border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 8px;">
+            <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: 8px; margin-top: 0;">Create Custom Beverage</h4>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="custom-drink-name" placeholder="e.g. Juice" style="flex: 1.5; padding: 6px 12px; font-size: 12px; background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; color:#fff;" />
+              <input type="number" id="custom-drink-amount" placeholder="ml" style="flex: 1; padding: 6px 12px; font-size: 12px; background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 6px; color:#fff;" min="1" max="2000" />
+              <button class="btn-primary" id="add-custom-drink-btn" style="padding: 6px 12px; font-size: 12px; border-radius: 6px;">+ Add</button>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; gap:8px; margin-top: 12px;">
             <input type="checkbox" id="coffee-diuretic-toggle" checked />
             <label for="coffee-diuretic-toggle" style="font-size:10px; text-transform:none;">Deduct coffee/tea (diuretic effect)</label>
           </div>
@@ -622,9 +654,9 @@
 
         <!-- Right Side: Weekly Hydration Stats, Streaks & Contextual alert -->
         <div style="flex: 1.2; padding-left: 20px; display:flex; flex-direction:column; gap:16px;">
-          <h3>🔥 Hydration Streak</h3>
-          <div class="streak-card" style="padding: 10px 14px; background: rgba(79,140,255,0.05); border-color: rgba(79,140,255,0.15);">
-            <span style="font-size:24px;">💧</span>
+          <h3 style="display:flex; align-items:center;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="color:#f97316; margin-right:6px; display:inline-block; vertical-align:middle;"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3z"/></svg>Hydration Streak</h3>
+          <div class="streak-card" style="padding: 10px 14px; background: rgba(79,140,255,0.05); border-color: rgba(79,140,255,0.15); display:flex; align-items:center; gap:10px;">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" style="color:#789ed4; display:block;"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
             <div>
               <div id="water-streak-label" style="font-weight:700; color:#4facfe;">0 Day Streak</div>
               <div class="helper-text" id="water-best-average">Average: 0 ml • Best Day: —</div>
@@ -634,7 +666,7 @@
 
           <!-- Contextual Task Hydration Alert -->
           <div id="water-contextual-alert" style="background: rgba(251,191,36,0.04); border: 1px solid rgba(251,191,36,0.15); padding:10px 14px; border-radius: var(--radius-sm); font-size:11px; line-height:1.5;">
-            💡 Study block starting soon! Drink a glass of water to maximize concentration.
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:#fbbf24; display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M9.663 17h4.674M12 3v1m0 16v1m-7-9h1m12 0h1M5.002 7.002l.707.707M18.29 18.29l.707.707M5.71 18.29l-.707.707M18.29 5.71l.707-.707M12 7a5 5 0 0 0-3 9h6a5 5 0 0 0-3-9z"/></svg>Study block starting soon! Drink a glass of water to maximize concentration.
           </div>
 
           <h3>Weekly Hydration Chart</h3>
@@ -654,10 +686,22 @@
 
   <!-- Dedicated Pomodoro Focus Overlay Modal -->
   <div class="modal-overlay hidden" id="pomodoro-modal-overlay">
+    <!-- Floating Notes Toggle (Only visible in fullscreen immersive mode) -->
+    <button id="pomo-notes-toggle-btn" class="hidden" style="position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 100000; background: var(--bg-card); border: 1px solid var(--border-color); border-right: none; border-radius: 8px 0 0 8px; padding: 12px 8px; cursor: pointer; color: var(--accent); transition: all 0.3s ease; display: flex; align-items: center; justify-content: center;">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(180deg);" id="pomo-notes-toggle-arrow"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    
+    <!-- Slide-out Immersive Scratchpad -->
+    <div id="pomo-immersive-notes-panel" class="hidden" style="position: fixed; right: -320px; top: 0; width: 320px; height: 100vh; background: #0c0b0e; border-left: 1px solid var(--border-color); box-shadow: -10px 0 30px rgba(0,0,0,0.5); z-index: 99999; display: flex; flex-direction: column; transition: right 0.3s cubic-bezier(0.16, 1, 0.3, 1); padding: 24px;">
+      <h3 style="font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-primary); margin-bottom: 12px;">Focus Notes</h3>
+      <textarea id="pomo-immersive-notes-textarea" placeholder="Dump thoughts, capture insights here... Autosaved." style="flex: 1; width: 100%; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; font-size: 13px; line-height: 1.5; color: #fff; resize: none; margin-bottom: 12px; outline: none; border-color: var(--border-color);"></textarea>
+      <div style="font-size: 11px; color: var(--text-secondary); text-align: right;" id="pomo-notes-save-status">Saved</div>
+    </div>
+
     <div class="modal" id="pomodoro-modal">
       <div class="modal-header">
-        <h2>🍅 Pomodoro Focus Workspace</h2>
-        <button class="btn-ghost" id="pomo-fullscreen-btn" style="padding: 6px 12px; font-size:11px; font-weight:700; margin-left: auto; margin-right: 12px; border-radius: 8px;">🧘 Immersive Focus</button>
+        <h2>Pomodoro Focus Workspace</h2>
+        <button class="btn-ghost" id="pomo-fullscreen-btn" style="padding: 6px 12px; font-size:11px; font-weight:700; margin-left: auto; margin-right: 12px; border-radius: 8px;">Immersive Focus</button>
         <button class="modal-close" id="pomodoro-modal-close-btn">×</button>
       </div>
       <div class="modal-body" style="text-align:center; padding: 32px 24px;">
@@ -666,11 +710,11 @@
             <span class="badge" id="pomo-mode" style="background:rgba(239,68,68,0.1); color:#f87171; font-size:13px; padding: 6px 12px;">Work Mode</span>
           </div>
           <!-- Forest Tree Grower Visual -->
-          <div id="pomo-forest-grower" style="margin: 0 auto 20px auto; width: 90px; height: 90px; display: flex; align-items: center; justify-content: center; font-size: 52px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 50%; position: relative; transition: all 0.4s ease;">
-            <span id="pomo-tree-emoji" style="display:inline-block; transition: transform 0.3s ease;">🤎</span>
+          <div id="pomo-forest-grower" style="margin: 0 auto 20px auto; width: 90px; height: 90px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 50%; position: relative; transition: all 0.4s ease;">
+            <div id="pomo-tree-container" style="width: 60px; height: 60px; display: flex; align-items: center; justify-content: center;"></div>
             <div id="pomo-tree-status" style="position: absolute; bottom: -8px; font-size: 8px; background: var(--accent); color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Planted</div>
           </div>
-
+ 
           <div class="pomo-display" id="pomo-display" style="font-size: 72px; font-weight:800; color: #f87171; margin-bottom: 24px;">25:00</div>
           <div class="pomo-rounds" id="pomo-rounds" style="font-size:18px; margin-bottom: 16px;">○○○○</div>
           <div class="pomo-task" id="pomo-task-label" style="font-size: 14px; font-weight:600; color:var(--text-secondary); margin-bottom:24px;">No active task selected</div>
@@ -681,20 +725,20 @@
           
           <div class="ambient-sounds-container" style="margin-top: 32px; border-top: 1px solid var(--border-color); padding-top: 24px; text-align: left;">
             <h3 style="font-size: 13px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary); display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
-              <span>🎵</span> Ambient Focus Sounds
+              Ambient Focus Sounds
             </h3>
             <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
               <button class="btn-ghost ambient-sound-btn" data-sound="rain" style="padding: 8px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                <span>🌧️</span> Rain
+                Rain
               </button>
               <button class="btn-ghost ambient-sound-btn" data-sound="cafe" style="padding: 8px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                <span>☕</span> Cafe
+                Cafe
               </button>
               <button class="btn-ghost ambient-sound-btn" data-sound="lofi" style="padding: 8px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                <span>🎧</span> Lo-Fi Beats
+                Lo-Fi Beats
               </button>
               <button class="btn-ghost ambient-sound-btn" data-sound="sitar" style="padding: 8px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
-                <span>🪕</span> Sitar
+                Sitar
               </button>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
@@ -705,24 +749,24 @@
           
           <div class="focus-scenes-container" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px; text-align: left;">
             <h3 style="font-size: 13px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary); display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
-              <span>🏞️</span> Focus Scenes
+              Focus Scenes
             </h3>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="focus-scene-picker">
-              <button class="btn-ghost scene-btn active" data-scene="rain" style="padding: 8px 12px; font-size: 12px;">🌧️ Rain Study</button>
-              <button class="btn-ghost scene-btn" data-scene="midnight" style="padding: 8px 12px; font-size: 12px;">🌙 Midnight Coding</button>
-              <button class="btn-ghost scene-btn" data-scene="library" style="padding: 8px 12px; font-size: 12px;">📚 Library Focus</button>
-              <button class="btn-ghost scene-btn" data-scene="sprint" style="padding: 8px 12px; font-size: 12px;">🔥 Exam Sprint</button>
-              <button class="btn-ghost scene-btn" data-scene="morning" style="padding: 8px 12px; font-size: 12px;">✨ Calm Morning</button>
+              <button class="btn-ghost scene-btn active" data-scene="rain" style="padding: 8px 12px; font-size: 12px;">Rain Study</button>
+              <button class="btn-ghost scene-btn" data-scene="midnight" style="padding: 8px 12px; font-size: 12px;">Midnight Coding</button>
+              <button class="btn-ghost scene-btn" data-scene="library" style="padding: 8px 12px; font-size: 12px;">Library Focus</button>
+              <button class="btn-ghost scene-btn" data-scene="sprint" style="padding: 8px 12px; font-size: 12px;">Exam Sprint</button>
+              <button class="btn-ghost scene-btn" data-scene="morning" style="padding: 8px 12px; font-size: 12px;">Calm Morning</button>
             </div>
           </div>
-
+ 
           <!-- Forest Garden Grid -->
           <div id="pomo-forest-garden" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px; text-align: left;">
             <h3 style="font-size: 13px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary); display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
-              <span>🌲</span> My Focus Forest (<span id="forest-tree-count">0</span> trees)
+              My Focus Forest (<span id="forest-tree-count">0</span> trees)
             </h3>
-            <div id="forest-garden-grid" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; padding: 12px; background: rgba(0,0,0,0.15); border-radius: 12px; min-height: 52px; align-content: center; justify-items: center; font-size: 20px; border: 1px solid var(--border-color);">
-              <!-- Emojis of grown trees will be inserted here -->
+            <div id="forest-garden-grid" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; padding: 12px; background: rgba(0,0,0,0.15); border-radius: 12px; min-height: 52px; align-content: center; justify-items: center; border: 1px solid var(--border-color);">
+              <!-- SVGs of grown trees will be inserted here -->
             </div>
           </div>
         </div>
@@ -768,11 +812,11 @@
           <div class="form-group">
             <label>Category</label>
             <select id="task-category">
-              <option value="work">💼 Work</option>
-              <option value="personal">🌿 Personal</option>
-              <option value="health">🏃 Health</option>
-              <option value="study">📚 Study</option>
-              <option value="other">✨ Other</option>
+              <option value="work">Work</option>
+              <option value="personal">Personal</option>
+              <option value="health">Health</option>
+              <option value="study">Study</option>
+              <option value="other">Other</option>
             </select>
           </div>
           <div class="form-group">
@@ -803,7 +847,7 @@
       </div>
     </div>
   </div>
-
+ 
   <!-- Settings Modal -->
   <div class="modal-overlay hidden" id="settings-modal-overlay">
     <div class="modal wide-modal" id="settings-modal" style="max-width: 800px;">
@@ -813,11 +857,11 @@
       </div>
       <div class="modal-body settings-body" style="display: flex; gap: 24px; min-height: 400px; padding: 20px;">
         <div class="settings-tabs" style="display: flex; flex-direction: column; gap: 8px; width: 180px; border-right: 1px solid var(--border-color); padding-right: 16px;">
-          <button class="settings-tab active" data-tab="account" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">👤 Account</button>
-          <button class="settings-tab" data-tab="appearance" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">🎨 Appearance</button>
-          <button class="settings-tab" data-tab="study-pref" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">📚 Study Prefs</button>
-          <button class="settings-tab" data-tab="notifications" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">🔔 Notifications</button>
-          <button class="settings-tab" data-tab="data-manage" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">💾 Data & Privacy</button>
+          <button class="settings-tab active" data-tab="account" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">Account</button>
+          <button class="settings-tab" data-tab="appearance" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">Appearance</button>
+          <button class="settings-tab" data-tab="study-pref" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">Study Prefs</button>
+          <button class="settings-tab" data-tab="notifications" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">Notifications</button>
+          <button class="settings-tab" data-tab="data-manage" style="text-align: left; padding: 10px 14px; border-radius: 8px; font-weight: 500;">Data & Privacy</button>
         </div>
         
         <div style="flex: 1; overflow-y: auto; max-height: 50vh; padding-right: 8px;">
@@ -835,15 +879,15 @@
             <div class="form-group">
               <label>Avatar</label>
               <div class="avatar-picker" id="settings-avatar-picker" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <span class="avatar-opt" data-avatar="🦁">🦁</span>
-                <span class="avatar-opt" data-avatar="🐯">🐯</span>
-                <span class="avatar-opt" data-avatar="🦊">🦊</span>
-                <span class="avatar-opt" data-avatar="🐺">🐺</span>
-                <span class="avatar-opt" data-avatar="🦅">🦅</span>
-                <span class="avatar-opt" data-avatar="🐉">🐉</span>
-                <span class="avatar-opt" data-avatar="🌙">🌙</span>
-                <span class="avatar-opt" data-avatar="⚡">⚡</span>
-                <span class="avatar-opt" data-avatar="🔥">🔥</span>
+                <span class="avatar-opt" data-avatar="⬡">⬡</span>
+                <span class="avatar-opt" data-avatar="✦">✦</span>
+                <span class="avatar-opt" data-avatar="◆">◆</span>
+                <span class="avatar-opt" data-avatar="●">●</span>
+                <span class="avatar-opt" data-avatar="■">■</span>
+                <span class="avatar-opt" data-avatar="▲">▲</span>
+                <span class="avatar-opt" data-avatar="▼">▼</span>
+                <span class="avatar-opt" data-avatar="★">★</span>
+                <span class="avatar-opt" data-avatar="⬢">⬢</span>
               </div>
             </div>
             <button class="btn-primary" id="save-profile-btn" style="margin-top: 12px; align-self: flex-start;">Save Profile</button>
@@ -909,9 +953,9 @@
               <label>Ambient Sound Preference</label>
               <select id="settings-study-sound">
                 <option value="none">No Sound</option>
-                <option value="rain">🌧️ Rain Storm</option>
-                <option value="cafe">☕ Busy Cafe</option>
-                <option value="lofi">🎧 Lo-Fi Beats</option>
+                <option value="rain">Rain Storm</option>
+                <option value="cafe">Busy Cafe</option>
+                <option value="lofi">Lo-Fi Beats</option>
               </select>
             </div>
             <div class="form-group">
@@ -928,21 +972,21 @@
               <div class="setting-row" style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                   <label style="text-transform: none; font-size: 13px; font-weight: 500; display:block;">Water hydration alerts</label>
-                  <span style="font-size:11px; color:var(--text-secondary);" id="water-notif-preview">Preview: "Time to drink water! 💧 You have logged 0ml so far."</span>
+                  <span style="font-size:11px; color:var(--text-secondary);" id="water-notif-preview">Preview: "Time to drink water! You have logged 0ml so far."</span>
                 </div>
                 <input type="checkbox" id="notif-toggle-water" checked style="width: 20px; height: 20px; cursor: pointer;" />
               </div>
               <div class="setting-row" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 12px;">
                 <div>
                   <label style="text-transform: none; font-size: 13px; font-weight: 500; display:block;">Deadline warning alerts</label>
-                  <span style="font-size:11px; color:var(--text-secondary);" id="deadline-notif-preview">Preview: "Task 'Math Study' is due in 2 hours! ⏳"</span>
+                  <span style="font-size:11px; color:var(--text-secondary);" id="deadline-notif-preview">Preview: "Task 'Math Study' is due in 2 hours!"</span>
                 </div>
                 <input type="checkbox" id="notif-toggle-deadline" checked style="width: 20px; height: 20px; cursor: pointer;" />
               </div>
               <div class="setting-row" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); padding-top: 12px;">
                 <div>
                   <label style="text-transform: none; font-size: 13px; font-weight: 500; display:block;">Habit nudge alerts</label>
-                  <span style="font-size:11px; color:var(--text-secondary);" id="habit-notif-preview">Preview: "Don't forget your habit 'Coding' tonight! 🌿"</span>
+                  <span style="font-size:11px; color:var(--text-secondary);" id="habit-notif-preview">Preview: "Don't forget your habit 'Coding' tonight!"</span>
                 </div>
                 <input type="checkbox" id="notif-toggle-habit" checked style="width: 20px; height: 20px; cursor: pointer;" />
               </div>
@@ -954,9 +998,9 @@
             <h3>Data Management & Privacy</h3>
             <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">Planory stores all your tasks, habits, hydration logs, and notes locally. You can export or clear your database at any time.</p>
             <div style="display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
-              <button class="btn-primary" id="data-export-btn" style="padding: 10px 16px; font-size: 12px;">📥 Export Data (JSON)</button>
-              <button class="btn-ghost" id="data-clear-btn" style="padding: 10px 16px; font-size: 12px; color: #f87171; border-color: rgba(248,113,113,0.3);">🗑️ Clear History</button>
-              <button class="btn-ghost" id="data-delete-btn" style="padding: 10px 16px; font-size: 12px; color: #f87171; border-color: rgba(248,113,113,0.3);">⚠️ Delete Account</button>
+              <button class="btn-primary" id="data-export-btn" style="padding: 10px 16px; font-size: 12px;">Export Data (JSON)</button>
+              <button class="btn-ghost" id="data-clear-btn" style="padding: 10px 16px; font-size: 12px; color: #f87171; border-color: rgba(248,113,113,0.3);">Clear History</button>
+              <button class="btn-ghost" id="data-delete-btn" style="padding: 10px 16px; font-size: 12px; color: #f87171; border-color: rgba(248,113,113,0.3);">Delete Account</button>
             </div>
           </div>
         </div>
@@ -982,11 +1026,11 @@
           <div class="form-group">
             <label>Category</label>
             <select id="expense-category">
-              <option value="Food">🍔 Food</option>
-              <option value="Transport">🚌 Transport</option>
-              <option value="Books">📚 Books/Study</option>
-              <option value="Entertainment">🎬 Entertainment</option>
-              <option value="Others">✨ Others</option>
+              <option value="Food">Food</option>
+              <option value="Transport">Transport</option>
+              <option value="Books">Books/Study</option>
+              <option value="Entertainment">Entertainment</option>
+              <option value="Others">Others</option>
             </select>
           </div>
           <div class="form-group">
@@ -1012,7 +1056,7 @@
   <div class="modal-overlay hidden" id="budget-insights-modal-overlay">
     <div class="modal wide-modal" id="budget-insights-modal" style="max-width: 850px;">
       <div class="modal-header">
-        <h2 style="font-family: var(--font-display); background: linear-gradient(135deg, #fff, #a1a0a5); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">💸 Student Budget Workspace</h2>
+        <h2 style="font-family: var(--font-display); background: linear-gradient(135deg, #fff, #a1a0a5); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Student Budget Workspace</h2>
         <button class="modal-close" id="insights-close-btn">×</button>
       </div>
       <div class="modal-body settings-body" style="padding: 24px; gap: 28px;">
@@ -1029,7 +1073,7 @@
           </div>
           <div class="form-group">
             <label>Savings Goal Target (₹)</label>
-            <input type="number" id="settings-savings-target" placeholder="e.g. 2000" />
+            <input type="number" id="settings-savings-target" placeholder="e.g. 200" style="flex: 1;" />
           </div>
           <div class="form-group">
             <label>Add Progress to Savings Goal (₹)</label>
@@ -1040,7 +1084,7 @@
           </div>
           <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
             <button class="btn-primary" id="save-budget-settings-btn" style="border-radius: 20px; font-size: 12px; padding: 10px 16px;">Save Settings ✓</button>
-            <button class="btn-primary" id="budget-add-expense-btn" style="background: linear-gradient(135deg, #10b981, #059669); color:#fff; box-shadow: 0 4px 14px rgba(16,185,129,0.25); border-radius: 20px; font-size: 13px; padding: 12px 16px; font-weight:700;">💸 + Log Expense</button>
+            <button class="btn-primary" id="budget-add-expense-btn" style="background: linear-gradient(135deg, #10b981, #059669); color:#fff; box-shadow: 0 4px 14px rgba(16,185,129,0.25); border-radius: 20px; font-size: 13px; padding: 12px 16px; font-weight:700;">+ Log Expense</button>
           </div>
         </div>
 
@@ -1056,7 +1100,7 @@
               <div class="budget-progress-bg" style="width: 100%; height: 10px; background: rgba(255,255,255,0.06); border-radius: 6px; overflow: hidden; position: relative;">
                 <div class="budget-progress-fill" id="budget-progress-fill" style="height: 100%; width: 0%; background: var(--accent-gradient); border-radius: 6px; transition: width 0.4s ease;"></div>
               </div>
-              <span class="helper-text hidden" id="budget-warning-label" style="color: var(--color-high); font-size: 11px; font-weight: 700; margin-top: 8px; display: inline-block;">⚠️ Warning: You've spent over 80% of your budget limit!</span>
+              <span class="helper-text hidden" id="budget-warning-label" style="color: var(--color-high); font-size: 11px; font-weight: 700; margin-top: 8px; display: inline-block;">Warning: You've spent over 80% of your budget limit!</span>
             </div>
           </div>
 
@@ -1202,19 +1246,19 @@
   <!-- MOBILE BOTTOM TABS -->
   <nav class="mobile-bottom-tabs" id="mobile-bottom-nav">
     <button class="tab-btn active" id="mobile-tab-weekly" data-tab="weekly">
-      <span class="tab-icon">🏠</span>
+      <span class="tab-icon" style="display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
       <span class="tab-label">Home</span>
     </button>
     <button class="tab-btn" id="mobile-tab-schedule" data-tab="schedule">
-      <span class="tab-icon">📅</span>
+      <span class="tab-icon" style="display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg></span>
       <span class="tab-label">Schedule</span>
     </button>
     <button class="tab-btn" id="mobile-tab-notes" data-tab="notes">
-      <span class="tab-icon">📝</span>
+      <span class="tab-icon" style="display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></span>
       <span class="tab-label">Notes</span>
     </button>
     <button class="tab-btn" id="mobile-tab-timer" data-tab="timer">
-      <span class="tab-icon">⏱️</span>
+      <span class="tab-icon" style="display: flex; align-items: center; justify-content: center;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
       <span class="tab-label">Timer</span>
     </button>
   </nav>
@@ -1244,13 +1288,13 @@
           <h3 class="section-label" style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.07em; margin:0;">Notes</h3>
           <div id="panel-notes-list"></div>
         </div>
-
+ 
         <!-- Pomodoro / Focus Summary -->
         <div class="detail-section" style="display:flex; flex-direction:column; gap:6px;">
           <h3 class="section-label" style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.07em; margin:0;">Focus Summary</h3>
           <div id="panel-focus-summary" style="font-size:13px; color:#fff;">0m focused today</div>
         </div>
-
+ 
         <!-- Water Log Summary -->
         <div class="detail-section" style="display:flex; flex-direction:column; gap:6px;">
           <h3 class="section-label" style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.07em; margin:0;">Water Summary</h3>
@@ -1259,12 +1303,12 @@
       </div>
     </div>
   </div>
-
+ 
   <!-- Command Palette Overlay -->
   <div class="modal-overlay hidden" id="command-palette-overlay" style="z-index:2200; background: rgba(0,0,0,0.6); align-items: flex-start; padding-top: 10vh;">
     <div class="command-palette-card" style="width: 550px; background: #1a1a1a; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: var(--shadow-lg); overflow: hidden; display:flex; flex-direction:column;">
       <div class="command-palette-search-wrap" style="display:flex; align-items:center; border-bottom: 1px solid var(--border-color); padding: 12px 16px;">
-        <span style="font-size:18px; margin-right:12px; color:var(--text-secondary);">🔍</span>
+        <span style="display:flex; align-items:center; justify-content:center; color:var(--text-secondary); margin-right:12px;"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/></svg></span>
         <input type="text" id="command-palette-input" placeholder="Type a command or search..." style="flex:1; background:none; border:none; color:#fff; font-size:15px; outline:none;" autocomplete="off" />
         <kbd style="background:rgba(255,255,255,0.08); font-size:10px; padding:3px 6px; border-radius:4px; color:var(--text-secondary);">ESC</kbd>
       </div>
@@ -1273,7 +1317,7 @@
       </div>
     </div>
   </div>
-
+ 
   <!-- Shortcuts Cheat Sheet Modal -->
   <div class="modal-overlay hidden" id="shortcuts-modal-overlay" style="z-index:2100;">
     <div class="modal" style="max-width: 450px;">
@@ -1310,7 +1354,7 @@
       </div>
     </div>
   </div>
-
+ 
   <!-- Slash Command Block Insertion Menu -->
   <div id="slash-menu" class="slash-menu hidden" style="z-index: 3000; background:#1a1a1a; border:1px solid var(--border-color); border-radius:8px; width:220px; box-shadow:var(--shadow-lg); overflow:hidden; position:fixed;">
     <div class="slash-item" data-block="h1" style="display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:pointer;">
@@ -1329,13 +1373,15 @@
       <span style="font-size:14px; font-weight:700; color:#fff;">—</span> <span style="font-size:11px; color:var(--text-secondary);">Divider line</span>
     </div>
   </div>
-
+ 
   <!-- Inline Formatting Popup Toolbar -->
   <div id="inline-toolbar" class="inline-toolbar hidden" style="z-index: 3100; background:#1a1a1a; border:1px solid var(--border-color); border-radius:6px; box-shadow:var(--shadow-md); padding:4px; display:flex; gap:4px; position:fixed; align-items:center;">
     <button class="inline-btn" data-cmd="bold" style="padding:4px 8px; font-size:11px; font-weight:700; color:#fff; border:none; background:none;">B</button>
     <button class="inline-btn" data-cmd="italic" style="padding:4px 8px; font-size:11px; font-style:italic; color:#fff; border:none; background:none;">I</button>
     <button class="inline-btn" data-cmd="code" style="padding:4px 8px; font-size:11px; font-family:monospace; color:#fff; border:none; background:none;">&lt;&gt;</button>
-    <button class="inline-btn" id="inline-link-btn" style="padding:4px 8px; font-size:11px; color:#fff; border:none; background:none;">🔗</button>
+    <button class="inline-btn" id="inline-link-btn" style="padding:4px 8px; font-size:11px; color:#fff; border:none; background:none; display: flex; align-items: center; justify-content: center;">
+      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+    </button>
   </div>
 
   <!-- Autocomplete mentions menu -->
