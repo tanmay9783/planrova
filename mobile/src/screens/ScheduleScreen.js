@@ -257,7 +257,7 @@ export default function ScheduleScreen() {
   const weekDates = getWeekDates();
   
   const renderDayCard = (dateObj) => {
-    const dayStr = dateObj.toISOString().split('T')[0];
+    const dayStr = dateObj.toLocaleDateString('en-CA'); // 'en-CA' gives YYYY-MM-DD in local timezone
     const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
     const monthDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     
@@ -329,7 +329,7 @@ export default function ScheduleScreen() {
   const minutes = focusMinutes % 60;
 
   // Calculations for Week Review
-  const weekDatesStr = weekDates.map(d => d.toISOString().split('T')[0]);
+  const weekDatesStr = weekDates.map(d => d.toLocaleDateString('en-CA')); // local YYYY-MM-DD
   const thisWeekTasks = tasks.filter(t => weekDatesStr.includes(t.date));
   const completedThisWeek = thisWeekTasks.filter(t => t.completed).length;
   const totalThisWeek = thisWeekTasks.length;
