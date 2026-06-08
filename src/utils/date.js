@@ -1,7 +1,8 @@
 // Date utilities for Radhe Planner
 
 export function getStartOfWeek(date) {
-  const d = new Date(date);
+  // If passed a string like '2026-06-08', parse as local noon to avoid UTC timezone shift
+  const d = typeof date === 'string' ? new Date(date + 'T12:00:00') : new Date(date);
   const day = d.getDay();
   // Adjust to start on Monday
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
@@ -10,7 +11,7 @@ export function getStartOfWeek(date) {
 
 export function getWeekDays(startDate) {
   const days = [];
-  const start = new Date(startDate);
+  const start = typeof startDate === 'string' ? new Date(startDate + 'T12:00:00') : new Date(startDate);
   for (let i = 0; i < 7; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);

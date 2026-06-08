@@ -274,7 +274,7 @@ function updateStatistics(tasks) {
   Object.keys(completionsPerDay).forEach(date => {
     if (completionsPerDay[date] > maxCount) {
       maxCount = completionsPerDay[date];
-      bestDayStr = new Date(date).toLocaleDateString('default', { weekday: 'short', day: 'numeric' });
+      bestDayStr = new Date(date + 'T12:00:00').toLocaleDateString('default', { weekday: 'short', day: 'numeric' });
     }
   });
   
@@ -598,7 +598,7 @@ function setupDropZones() {
       // Trigger Undo Toast
       const toast = document.getElementById('undo-toast');
       const progress = document.getElementById('undo-progress');
-      const dayName = new Date(targetDate).toLocaleDateString('default', { weekday: 'long' });
+      const dayName = new Date(targetDate + 'T12:00:00').toLocaleDateString('default', { weekday: 'long' });
       
       document.getElementById('undo-msg').textContent = `Task moved to ${dayName}.`;
       toast.classList.remove('hidden');
@@ -712,7 +712,7 @@ export function openDayDetailPanel(dateStr) {
   if (!panel) return;
   
   // Set date title
-  const dateObj = new Date(dateStr);
+  const dateObj = new Date(dateStr + 'T12:00:00');
   const formattedDate = dateObj.toLocaleDateString('default', { weekday: 'long', month: 'long', day: 'numeric' });
   document.getElementById('day-detail-title').textContent = formattedDate;
   panel.dataset.date = dateStr;
