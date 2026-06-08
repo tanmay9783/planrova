@@ -301,7 +301,7 @@ export default function ProfileScreen() {
         const daysAgo = (3 - col) * 7 + (6 - row);
         const cellDate = new Date();
         cellDate.setDate(today.getDate() - daysAgo);
-        const dateStr = cellDate.toISOString().split('T')[0];
+        const dateStr = cellDate.toLocaleDateString('en-CA'); // local YYYY-MM-DD, not UTC
 
         // Tasks completed count on this date
         const dayCompletedCount = tasks.filter(t => t.date === dateStr && t.completed).length;
