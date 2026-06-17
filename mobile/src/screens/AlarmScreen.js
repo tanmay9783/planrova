@@ -15,7 +15,8 @@ import {
   Platform,
   Easing,
   StatusBar,
-  RefreshControl
+  RefreshControl,
+  NativeModules
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +32,7 @@ import { Accelerometer, Pedometer } from 'expo-sensors';
 import { useRoute } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
+const { AlarmModule } = NativeModules;
 
 const SOUND_ASSETS = {
   rain: require('../../assets/music/rain.mp3'),
@@ -151,6 +153,38 @@ export default function AlarmScreen() {
   // ── Notification Permission (contextual, on first screen visit) ──────────
   useEffect(() => {
     requestNotificationPermission();
+
+    if (Platform.OS === 'android' && AlarmModule) {
+      const checkNativePermissions = async () => {
+        try {
+          const perms = await AlarmModule.checkPermissions();
+          console.log('[AlarmScreen] Native permissions check:', perms);
+          
+          if (!perms.canScheduleExactAlarms) {
+            Alert.alert(
+              "Exact Alarm Permission Required ⏰",
+              "To make sure your alarms trigger precisely on time even when your phone is in Doze mode, Planrova needs exact alarm permissions. Please grant it in the next screen.",
+              [
+                { text: "Cancel", style: "cancel" },
+                { text: "Grant", onPress: () => AlarmModule.requestExactAlarmPermission() }
+              ]
+            );
+          } else if (!perms.isIgnoringBatteryOptimizations) {
+            Alert.alert(
+              "Disable Battery Optimization ⚡",
+              "Planrova needs background execution rights to ring alarms while the app is closed. Please disable battery optimization for Planrova in the next screen.",
+              [
+                { text: "Cancel", style: "cancel" },
+                { text: "Configure", onPress: () => AlarmModule.requestDisableBatteryOptimization() }
+              ]
+            );
+          }
+        } catch (e) {
+          console.warn('[AlarmScreen] Error checking native permissions:', e);
+        }
+      };
+      setTimeout(checkNativePermissions, 1500);
+    }
   }, []);
 
   // ── Schedule all enabled alarms as system notifications ──────────────────
@@ -158,53 +192,178 @@ export default function AlarmScreen() {
   // ── Schedule all enabled alarms as system notifications ──────────────────
   // This makes alarms work even when the app is closed/backgrounded.
   const scheduleAlarmNotifications = async (list, legacyWakeAlarm) => {
-    // Cancel all previously scheduled alarm notifications
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    for (const notif of scheduled) {
-      if (notif.content.data?.type === 'alarm' || notif.content.data?.type === 'legacy-alarm') {
-        await Notifications.cancelScheduledNotificationAsync(notif.identifier);
-      }
-    }
+    // Helper to map weekday names to integer values for Android Calendar constants
+    // Calendar.SUNDAY = 1, Calendar.MONDAY = 2, etc.
+    const mapDaysToIntegers = (daysArray) => {
+      const dayMap = { Sun: 1, Mon: 2, Tue: 3, Wed: 4, Thu: 5, Fri: 6, Sat: 7 };
+      return (daysArray || []).map(day => dayMap[day]).filter(Boolean);
+    };
 
-    const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-
-    // 1. Schedule custom alarms from alarmsList
-    for (const alarm of list) {
-      if (!alarm.enabled) continue;
+    // 1. Prepare unified structure for native alarms
+    const nativeAlarmsList = (list || []).map(alarm => {
       const [h, m] = alarm.time.split(':').map(Number);
-      const ringtoneKey = alarm.ringtone?.assetKey || 'lofi';
+      return {
+        id: alarm.id,
+        hour: h,
+        minute: m,
+        days: mapDaysToIntegers(alarm.days),
+        enabled: alarm.enabled,
+        label: alarm.label || 'Alarm',
+        mission: alarm.mission || 'none',
+        ringtone: alarm.ringtone?.assetKey || 'lofi',
+        snoozeTime: 5
+      };
+    });
 
-      if (alarm.days && alarm.days.length > 0) {
-        // Schedule for each selected weekday
-        for (const day of alarm.days) {
+    // 2. Call native module if available on Android
+    if (Platform.OS === 'android' && AlarmModule) {
+      try {
+        const unifiedData = {
+          alarmsList: nativeAlarmsList,
+          alarms: legacyWakeAlarm ? {
+            wakeTime: legacyWakeAlarm.wakeTime,
+            wakeEnabled: legacyWakeAlarm.wakeEnabled,
+            wakeMission: legacyWakeAlarm.wakeMission || 'none',
+            wakeRingtone: legacyWakeAlarm.wakeRingtone || { assetKey: 'lofi' }
+          } : null
+        };
+        await AlarmModule.saveAlarms(JSON.stringify(unifiedData));
+        console.log('[AlarmScreen] Synced alarms to native SharedPreferences');
+      } catch (e) {
+        console.error('[AlarmScreen] Failed to save alarms natively:', e);
+      }
+    } else {
+      // Fallback for iOS or Expo Go to cancel and schedule using expo-notifications
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      for (const notif of scheduled) {
+        if (notif.content.data?.type === 'alarm' || notif.content.data?.type === 'legacy-alarm') {
+          await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+        }
+      }
+
+      const dayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+      // 1. Schedule custom alarms from alarmsList
+      for (const alarm of list) {
+        if (!alarm.enabled) continue;
+        const [h, m] = alarm.time.split(':').map(Number);
+        const ringtoneKey = alarm.ringtone?.assetKey || 'lofi';
+
+        if (alarm.days && alarm.days.length > 0) {
+          for (const day of alarm.days) {
+            try {
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: `⏰ Alarm — ${alarm.time}`,
+                  body: alarm.mission !== 'none'
+                    ? `Wake up mission: ${alarm.mission.toUpperCase()}. Complete your task to earn XP!`
+                    : 'Time to wake up and start your day, grinder!',
+                  data: { type: 'alarm', alarmId: alarm.id },
+                  sound: `${ringtoneKey}.mp3`,
+                  categoryIdentifier: 'ALARM_CATEGORY',
+                },
+                trigger: {
+                  type: 'weekly',
+                  channelId: `alarm_${ringtoneKey}`,
+                  weekday: dayMap[day] + 1,
+                  hour: h,
+                  minute: m,
+                },
+              });
+            } catch (e) {
+              console.warn("Failed scheduling with custom alarm channel, falling back to default:", e);
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: `⏰ Alarm — ${alarm.time}`,
+                  body: alarm.mission !== 'none'
+                    ? `Wake up mission: ${alarm.mission.toUpperCase()}. Complete your task to earn XP!`
+                    : 'Time to wake up and start your day, grinder!',
+                  data: { type: 'alarm', alarmId: alarm.id },
+                  sound: true,
+                  categoryIdentifier: 'ALARM_CATEGORY',
+                },
+                trigger: {
+                  type: 'weekly',
+                  channelId: 'default_v2',
+                  weekday: dayMap[day] + 1,
+                  hour: h,
+                  minute: m,
+                },
+              });
+            }
+          }
+        } else {
+          // Daily alarm (no specific days)
           try {
             await Notifications.scheduleNotificationAsync({
               content: {
                 title: `⏰ Alarm — ${alarm.time}`,
-                body: alarm.mission !== 'none'
-                  ? `Wake up mission: ${alarm.mission.toUpperCase()}. Complete your task to earn XP!`
-                  : 'Time to wake up and start your day, grinder!',
+                body: 'Time to wake up and start your day!',
                 data: { type: 'alarm', alarmId: alarm.id },
                 sound: `${ringtoneKey}.mp3`,
                 categoryIdentifier: 'ALARM_CATEGORY',
               },
               trigger: {
-                type: 'weekly',
+                type: 'daily',
                 channelId: `alarm_${ringtoneKey}`,
-                weekday: dayMap[day] + 1, // Expo weekday is 1=Sun...7=Sat
                 hour: h,
                 minute: m,
               },
             });
           } catch (e) {
-            console.warn("Failed scheduling with custom alarm channel, falling back to default:", e);
+            console.warn("Failed scheduling daily alarm with custom channel, falling back to default:", e);
             await Notifications.scheduleNotificationAsync({
               content: {
                 title: `⏰ Alarm — ${alarm.time}`,
-                body: alarm.mission !== 'none'
-                  ? `Wake up mission: ${alarm.mission.toUpperCase()}. Complete your task to earn XP!`
-                  : 'Time to wake up and start your day, grinder!',
+                body: 'Time to wake up and start your day!',
                 data: { type: 'alarm', alarmId: alarm.id },
+                sound: true,
+                categoryIdentifier: 'ALARM_CATEGORY',
+              },
+              trigger: {
+                type: 'daily',
+                channelId: 'default_v2',
+                hour: h,
+                minute: m,
+              },
+            });
+          }
+        }
+      }
+
+      // 2. Schedule legacy wake alarm if enabled
+      if (legacyWakeAlarm && legacyWakeAlarm.wakeEnabled && legacyWakeAlarm.wakeTime) {
+        const [h, m] = legacyWakeAlarm.wakeTime.split(':').map(Number);
+        const legacyRingtoneKey = legacyWakeAlarm.wakeRingtone?.assetKey || 'lofi';
+        for (const day of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']) {
+          try {
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: `⏰ Wake Up — ${legacyWakeAlarm.wakeTime}`,
+                body: legacyWakeAlarm.wakeMission !== 'none'
+                  ? `Wake up mission: ${legacyWakeAlarm.wakeMission.toUpperCase()}. Complete your task to earn XP!`
+                  : 'Time to wake up and start your day, grinder!',
+                data: { type: 'alarm', alarmId: 'legacy-wake' },
+                sound: `${legacyRingtoneKey}.mp3`,
+                categoryIdentifier: 'ALARM_CATEGORY',
+              },
+              trigger: {
+                type: 'weekly',
+                channelId: `alarm_${legacyRingtoneKey}`,
+                weekday: dayMap[day] + 1,
+                hour: h,
+                minute: m,
+              },
+            });
+          } catch (e) {
+            console.warn("Failed scheduling legacy alarm with custom channel, falling back to default:", e);
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: `⏰ Wake Up — ${legacyWakeAlarm.wakeTime}`,
+                body: legacyWakeAlarm.wakeMission !== 'none'
+                  ? `Wake up mission: ${legacyWakeAlarm.wakeMission.toUpperCase()}. Complete your task to earn XP!`
+                  : 'Time to wake up and start your day, grinder!',
+                data: { type: 'alarm', alarmId: 'legacy-wake' },
                 sound: true,
                 categoryIdentifier: 'ALARM_CATEGORY',
               },
@@ -217,91 +376,6 @@ export default function AlarmScreen() {
               },
             });
           }
-        }
-      } else {
-        // Daily alarm (no specific days)
-        try {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: `⏰ Alarm — ${alarm.time}`,
-              body: 'Time to wake up and start your day!',
-              data: { type: 'alarm', alarmId: alarm.id },
-              sound: `${ringtoneKey}.mp3`,
-              categoryIdentifier: 'ALARM_CATEGORY',
-            },
-            trigger: {
-              type: 'daily',
-              channelId: `alarm_${ringtoneKey}`,
-              hour: h,
-              minute: m,
-            },
-          });
-        } catch (e) {
-          console.warn("Failed scheduling daily alarm with custom channel, falling back to default:", e);
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: `⏰ Alarm — ${alarm.time}`,
-              body: 'Time to wake up and start your day!',
-              data: { type: 'alarm', alarmId: alarm.id },
-              sound: true,
-              categoryIdentifier: 'ALARM_CATEGORY',
-            },
-            trigger: {
-              type: 'daily',
-              channelId: 'default_v2',
-              hour: h,
-              minute: m,
-            },
-          });
-        }
-      }
-    }
-
-    // 2. Schedule legacy wake alarm if enabled
-    if (legacyWakeAlarm && legacyWakeAlarm.wakeEnabled && legacyWakeAlarm.wakeTime) {
-      const [h, m] = legacyWakeAlarm.wakeTime.split(':').map(Number);
-      const legacyRingtoneKey = legacyWakeAlarm.wakeRingtone?.assetKey || 'lofi';
-      // Schedule legacy alarm for every day of the week
-      for (const day of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']) {
-        try {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: `⏰ Wake Up — ${legacyWakeAlarm.wakeTime}`,
-              body: legacyWakeAlarm.wakeMission !== 'none'
-                ? `Wake up mission: ${legacyWakeAlarm.wakeMission.toUpperCase()}. Complete your task to earn XP!`
-                : 'Time to wake up and start your day, grinder!',
-              data: { type: 'alarm', alarmId: 'legacy-wake' },
-              sound: `${legacyRingtoneKey}.mp3`,
-              categoryIdentifier: 'ALARM_CATEGORY',
-            },
-            trigger: {
-              type: 'weekly',
-              channelId: `alarm_${legacyRingtoneKey}`,
-              weekday: dayMap[day] + 1, // 1=Sun...7=Sat
-              hour: h,
-              minute: m,
-            },
-          });
-        } catch (e) {
-          console.warn("Failed scheduling legacy alarm with custom channel, falling back to default:", e);
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: `⏰ Wake Up — ${legacyWakeAlarm.wakeTime}`,
-              body: legacyWakeAlarm.wakeMission !== 'none'
-                ? `Wake up mission: ${legacyWakeAlarm.wakeMission.toUpperCase()}. Complete your task to earn XP!`
-                : 'Time to wake up and start your day, grinder!',
-              data: { type: 'alarm', alarmId: 'legacy-wake' },
-              sound: true,
-              categoryIdentifier: 'ALARM_CATEGORY',
-            },
-            trigger: {
-              type: 'weekly',
-              channelId: 'default_v2',
-              weekday: dayMap[day] + 1, // 1=Sun...7=Sat
-              hour: h,
-              minute: m,
-            },
-          });
         }
       }
     }
