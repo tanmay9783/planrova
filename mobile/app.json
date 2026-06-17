@@ -78,9 +78,7 @@
       "expo-asset"
     ],
     "owner": "tanmay041",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/1a1b4d70-c3e4-4770-aede-2c5a0f3b0b3e"
     }
