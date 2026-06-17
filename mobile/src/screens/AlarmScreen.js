@@ -206,6 +206,7 @@ export default function AlarmScreen() {
                   : 'Time to wake up and start your day, grinder!',
                 data: { type: 'alarm', alarmId: alarm.id },
                 sound: true,
+                categoryIdentifier: 'ALARM_CATEGORY',
               },
               trigger: {
                 type: 'weekly',
@@ -243,6 +244,7 @@ export default function AlarmScreen() {
               body: 'Time to wake up and start your day!',
               data: { type: 'alarm', alarmId: alarm.id },
               sound: true,
+              categoryIdentifier: 'ALARM_CATEGORY',
             },
             trigger: {
               type: 'daily',
@@ -290,6 +292,7 @@ export default function AlarmScreen() {
                 : 'Time to wake up and start your day, grinder!',
               data: { type: 'alarm', alarmId: 'legacy-wake' },
               sound: true,
+              categoryIdentifier: 'ALARM_CATEGORY',
             },
             trigger: {
               type: 'weekly',
