@@ -132,6 +132,18 @@ class AlarmService : Service() {
             }
         }
 
+        // Direct Activity Launch if Overlay Permission is granted (bypasses background limitations)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && android.provider.Settings.canDrawOverlays(this)) {
+            try {
+                startActivity(fullScreenIntent)
+                Log.d("AlarmService", "AlarmActivity started directly via startActivity because overlay permission is granted")
+            } catch (e: Exception) {
+                Log.e("AlarmService", "Failed to start AlarmActivity directly", e)
+            }
+        } else {
+            Log.w("AlarmService", "Overlay permission not granted. Relying only on fullScreenIntent fallback.")
+        }
+
         // 6. Play Alarm Sound
         playAlarmSound(ringtoneKey)
 

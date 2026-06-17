@@ -99,6 +99,13 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
         }
         map.putBoolean("isIgnoringBatteryOptimizations", isIgnoringBattery)
 
+        // 4. Overlay / System Alert Window Permission
+        var canDrawOverlays = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            canDrawOverlays = Settings.canDrawOverlays(reactContext)
+        }
+        map.putBoolean("canDrawOverlays", canDrawOverlays)
+
         promise.resolve(map)
     }
 
@@ -136,6 +143,23 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
                 } catch (ex: Exception) {
                     Log.e("AlarmModule", "Error opening battery optimization settings", ex)
                 }
+            }
+        }
+    }
+
+    @ReactMethod
+    fun requestOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val intent = Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${reactContext.packageName}")
+                ).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                reactContext.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e("AlarmModule", "Error requesting overlay permission", e)
             }
         }
     }

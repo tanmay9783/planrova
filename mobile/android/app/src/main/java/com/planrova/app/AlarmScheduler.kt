@@ -106,20 +106,20 @@ object AlarmScheduler {
                 return
             }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTimeMillis,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    triggerTimeMillis,
-                    pendingIntent
-                )
+            // Create a pending intent to open the app when the user taps on the alarm status info
+            val showIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
-            Log.d("AlarmScheduler", "Scheduled exact doze-immune alarm for $id at $triggerTimeMillis")
+            val showPendingIntent = PendingIntent.getActivity(
+                context,
+                requestCode + 99,
+                showIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTimeMillis, showPendingIntent)
+            alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+            Log.d("AlarmScheduler", "Scheduled AlarmClock alarm for $id at $triggerTimeMillis")
         } catch (e: SecurityException) {
             Log.e("AlarmScheduler", "SecurityException scheduling exact alarm. Trying inexact fallback...", e)
             try {

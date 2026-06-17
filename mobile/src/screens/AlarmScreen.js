@@ -16,7 +16,8 @@ import {
   Easing,
   StatusBar,
   RefreshControl,
-  NativeModules
+  NativeModules,
+  AppState
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -133,6 +134,26 @@ export default function AlarmScreen() {
 
   const [activeRingingAlarm, setActiveRingingAlarm] = useState(null);
 
+  // Native permissions state for dashboard warning
+  const [permissionStatus, setPermissionStatus] = useState({
+    canScheduleExactAlarms: true,
+    areNotificationsEnabled: true,
+    isIgnoringBatteryOptimizations: true,
+    canDrawOverlays: true
+  });
+
+  const checkNativePermissions = async () => {
+    if (Platform.OS === 'android' && AlarmModule) {
+      try {
+        const perms = await AlarmModule.checkPermissions();
+        setPermissionStatus(perms);
+        console.log('[AlarmScreen] Native permissions updated:', perms);
+      } catch (e) {
+        console.warn('[AlarmScreen] Error checking native permissions:', e);
+      }
+    }
+  };
+
   // ── Trigger alarm ringing if screen opened from notification action ──
   useEffect(() => {
     if (route.params?.triggerAlarmOnOpen) {
@@ -150,41 +171,27 @@ export default function AlarmScreen() {
     }
   }, [route.params, alarmsList]);
 
-  // ── Notification Permission (contextual, on first screen visit) ──────────
+  // ── Notification Permission & Permissions Sync ──────────
   useEffect(() => {
-    requestNotificationPermission();
+    // Attempt to request notification permission initially
+    requestNotificationPermission().then(() => {
+      checkNativePermissions();
+    });
 
-    if (Platform.OS === 'android' && AlarmModule) {
-      const checkNativePermissions = async () => {
-        try {
-          const perms = await AlarmModule.checkPermissions();
-          console.log('[AlarmScreen] Native permissions check:', perms);
-          
-          if (!perms.canScheduleExactAlarms) {
-            Alert.alert(
-              "Exact Alarm Permission Required ⏰",
-              "To make sure your alarms trigger precisely on time even when your phone is in Doze mode, Planrova needs exact alarm permissions. Please grant it in the next screen.",
-              [
-                { text: "Cancel", style: "cancel" },
-                { text: "Grant", onPress: () => AlarmModule.requestExactAlarmPermission() }
-              ]
-            );
-          } else if (!perms.isIgnoringBatteryOptimizations) {
-            Alert.alert(
-              "Disable Battery Optimization ⚡",
-              "Planrova needs background execution rights to ring alarms while the app is closed. Please disable battery optimization for Planrova in the next screen.",
-              [
-                { text: "Cancel", style: "cancel" },
-                { text: "Configure", onPress: () => AlarmModule.requestDisableBatteryOptimization() }
-              ]
-            );
-          }
-        } catch (e) {
-          console.warn('[AlarmScreen] Error checking native permissions:', e);
-        }
-      };
-      setTimeout(checkNativePermissions, 1500);
-    }
+    // Check permissions whenever app comes back from background
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkNativePermissions();
+      }
+    });
+
+    // Run check once on load after short timeout to let things settle
+    const timer = setTimeout(checkNativePermissions, 1000);
+
+    return () => {
+      subscription.remove();
+      clearTimeout(timer);
+    };
   }, []);
 
   // ── Schedule all enabled alarms as system notifications ──────────────────
@@ -585,9 +592,9 @@ export default function AlarmScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => {
+    checkNativePermissions().finally(() => {
       setRefreshing(false);
-    }, 1500);
+    });
   };
 
   const [nextAlarmData, setNextAlarmData] = useState(null);
@@ -1482,6 +1489,89 @@ export default function AlarmScreen() {
             <Ionicons name="notifications-outline" size={20} color="#F3F1EC" />
           </TouchableOpacity>
         </View>
+
+        {Platform.OS === 'android' && (
+          (!permissionStatus.canScheduleExactAlarms ||
+           !permissionStatus.areNotificationsEnabled ||
+           !permissionStatus.isIgnoringBatteryOptimizations ||
+           !permissionStatus.canDrawOverlays)
+        ) && (
+          <View style={styles.permissionWarningCard}>
+            <View style={styles.permissionWarningHeader}>
+              <Ionicons name="warning-outline" size={20} color="#E11D48" />
+              <Text style={styles.permissionWarningTitle}>Permissions Configuration Required</Text>
+            </View>
+            <Text style={styles.permissionWarningDesc}>
+              To make sure alarms ring on time and display wake-up missions even when the screen is locked, please enable:
+            </Text>
+            
+            <View style={styles.permissionStatusList}>
+              {!permissionStatus.canScheduleExactAlarms && (
+                <View style={styles.permissionStatusRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.permissionName}>⏰ Alarms & Reminders (Exact Alarms)</Text>
+                    <Text style={styles.permissionExplain}>Ensures exact doze-immune scheduling.</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.permissionActionBtn}
+                    onPress={() => AlarmModule.requestExactAlarmPermission()}
+                  >
+                    <Text style={styles.permissionActionText}>Grant</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {!permissionStatus.areNotificationsEnabled && (
+                <View style={styles.permissionStatusRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.permissionName}>🔔 Push Notifications</Text>
+                    <Text style={styles.permissionExplain}>Needed to show alarm alerts and play sound.</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.permissionActionBtn}
+                    onPress={() => requestNotificationPermission().then(checkNativePermissions)}
+                  >
+                    <Text style={styles.permissionActionText}>Grant</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {!permissionStatus.isIgnoringBatteryOptimizations && (
+                <View style={styles.permissionStatusRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.permissionName}>⚡ Ignore Battery Optimization</Text>
+                    <Text style={styles.permissionExplain}>Allows alarm activity when screen is off.</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.permissionActionBtn}
+                    onPress={() => AlarmModule.requestDisableBatteryOptimization()}
+                  >
+                    <Text style={styles.permissionActionText}>Exclude</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {!permissionStatus.canDrawOverlays && (
+                <View style={styles.permissionStatusRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.permissionName}>📺 Draw Over Other Apps (Overlay)</Text>
+                    <Text style={styles.permissionExplain}>Needed to show mission screen over lockscreen.</Text>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.permissionActionBtn}
+                    onPress={() => AlarmModule.requestOverlayPermission()}
+                  >
+                    <Text style={styles.permissionActionText}>Enable</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+            
+            <Text style={styles.oemSettingsTip}>
+              💡 Xiaomi/POCO: Also manually grant "Show on Lock Screen" and "Start in Background" in App Info -&gt; Other Permissions.
+            </Text>
+          </View>
+        )}
 
         {/* Tab Segment Controls */}
         <View style={styles.segmentedContainer}>
@@ -3330,5 +3420,81 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: '#C2A878',
     paddingBottom: 0,
+  },
+  permissionWarningCard: {
+    backgroundColor: '#1C161D',
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 72, 0.2)',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 15,
+  },
+  permissionWarningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  permissionWarningTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 14,
+    color: '#E11D48',
+  },
+  permissionWarningDesc: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    color: '#A1A8B6',
+    lineHeight: 16,
+    marginBottom: 12,
+  },
+  permissionStatusList: {
+    gap: 10,
+    marginBottom: 8,
+  },
+  permissionStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#261F29',
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(225, 29, 72, 0.08)',
+  },
+  permissionName: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12,
+    color: '#F3F1EC',
+  },
+  permissionExplain: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 10,
+    color: '#8B92A0',
+    marginTop: 2,
+  },
+  permissionActionBtn: {
+    backgroundColor: '#E11D48',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  permissionActionText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#F3F1EC',
+    fontSize: 11,
+  },
+  oemSettingsTip: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 10,
+    color: '#C2A878',
+    marginTop: 10,
+    lineHeight: 14,
+    backgroundColor: '#1E1B15',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(194, 168, 120, 0.15)',
   },
 });
