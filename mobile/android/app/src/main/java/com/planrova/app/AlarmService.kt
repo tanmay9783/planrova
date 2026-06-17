@@ -110,13 +110,26 @@ class AlarmService : Service() {
 
         // 5. Start Foreground Service
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-            )
+            try {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } catch (e: Exception) {
+                Log.e("AlarmService", "Failed to start FGS with mediaPlayback type, trying standard FGS", e)
+                try {
+                    startForeground(NOTIFICATION_ID, notification)
+                } catch (ex: Exception) {
+                    Log.e("AlarmService", "Failed to start standard FGS as well", ex)
+                }
+            }
         } else {
-            startForeground(NOTIFICATION_ID, notification)
+            try {
+                startForeground(NOTIFICATION_ID, notification)
+            } catch (e: Exception) {
+                Log.e("AlarmService", "Failed to start FGS below Android Q", e)
+            }
         }
 
         // 6. Play Alarm Sound

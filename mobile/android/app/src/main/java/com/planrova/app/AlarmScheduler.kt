@@ -87,6 +87,25 @@ object AlarmScheduler {
         )
 
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+                // Fallback to inexact doze-immune alarm if permission is missing
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTimeMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.set(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTimeMillis,
+                        pendingIntent
+                    )
+                }
+                Log.w("AlarmScheduler", "Exact alarm permission not granted. Scheduled inexact fallback alarm for $id")
+                return
+            }
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
@@ -102,7 +121,24 @@ object AlarmScheduler {
             }
             Log.d("AlarmScheduler", "Scheduled exact doze-immune alarm for $id at $triggerTimeMillis")
         } catch (e: SecurityException) {
-            Log.e("AlarmScheduler", "Permission check failed: Cannot schedule exact alarm", e)
+            Log.e("AlarmScheduler", "SecurityException scheduling exact alarm. Trying inexact fallback...", e)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTimeMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.set(
+                        AlarmManager.RTC_WAKEUP,
+                        triggerTimeMillis,
+                        pendingIntent
+                    )
+                }
+            } catch (ex: Exception) {
+                Log.e("AlarmScheduler", "Inexact fallback scheduling failed", ex)
+            }
         }
     }
 
