@@ -39,14 +39,18 @@ export async function requestNotificationPermission() {
 
     const ringtones = ['lofi', 'rain', 'sitar', 'tapri'];
     for (const key of ringtones) {
-      await Notifications.setNotificationChannelAsync(`alarm_${key}`, {
-        name: `Alarm - ${key.toUpperCase()}`,
-        importance: Notifications.AndroidImportance.MAX,
-        bypassDnd: true,
-        vibrationPattern: [0, 500, 250, 500, 250, 500, 250, 500],
-        lightColor: '#C2A878',
-        sound: `${key}.mp3`,
-      });
+      try {
+        await Notifications.setNotificationChannelAsync(`alarm_${key}`, {
+          name: `Alarm - ${key.toUpperCase()}`,
+          importance: Notifications.AndroidImportance.MAX,
+          bypassDnd: true,
+          vibrationPattern: [0, 500, 250, 500, 250, 500, 250, 500],
+          lightColor: '#C2A878',
+          sound: `${key}.mp3`,
+        });
+      } catch (err) {
+        console.warn(`Could not create custom channel alarm_${key}:`, err);
+      }
     }
   }
 
