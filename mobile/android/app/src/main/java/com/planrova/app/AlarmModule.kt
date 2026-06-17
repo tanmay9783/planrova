@@ -187,4 +187,46 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
             }
         }
     }
+
+    @ReactMethod
+    fun requestAutostartPermission() {
+        val intent = android.content.Intent()
+        val components = arrayOf(
+            // Xiaomi / POCO / Redmi
+            android.content.ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
+            // Oppo / ColorOS / Realme
+            android.content.ComponentName("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"),
+            android.content.ComponentName("com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"),
+            // Vivo
+            android.content.ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"),
+            android.content.ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"),
+            // Huawei
+            android.content.ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"),
+            android.content.ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity")
+        )
+
+        for (comp in components) {
+            try {
+                intent.component = comp
+                intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                reactContext.startActivity(intent)
+                Log.d("AlarmModule", "Successfully opened autostart settings via ComponentName: " + comp.className)
+                return
+            } catch (e: Exception) {
+                // Try next one
+            }
+        }
+
+        // Fallback to standard App Details page
+        try {
+            val intentFallback = android.content.Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:${reactContext.packageName}")
+                flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            reactContext.startActivity(intentFallback)
+            Log.d("AlarmModule", "Opened standard App Settings fallback for autostart")
+        } catch (ex: Exception) {
+            Log.e("AlarmModule", "Error opening fallback settings for autostart", ex)
+        }
+    }
 }

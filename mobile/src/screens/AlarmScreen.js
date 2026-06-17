@@ -1569,14 +1569,27 @@ export default function AlarmScreen() {
             
             <View style={styles.oemSettingsTipContainer}>
               <Text style={styles.oemSettingsTipText}>
-                💡 Xiaomi/POCO/Redmi: You must also manually grant "Show on Lock Screen" and "Start in Background" permissions.
+                ⚠️ OEM Devices (Xiaomi, POCO, Vivo, Oppo, OnePlus, Huawei):
+                To prevent the system from killing your alarms when you close the app, you must configure Autostart and Lock Screen permissions:
               </Text>
-              <TouchableOpacity 
-                style={styles.oemSettingsBtn}
-                onPress={() => AlarmModule.requestMiuiPermission()}
-              >
-                <Text style={styles.oemSettingsBtnText}>Open Other Permissions Settings</Text>
-              </TouchableOpacity>
+              
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                <TouchableOpacity 
+                  style={styles.oemSettingsBtn}
+                  onPress={() => AlarmModule.requestAutostartPermission()}
+                >
+                  <Text style={styles.oemSettingsBtnText}>1. Enable Autostart 🚀</Text>
+                </TouchableOpacity>
+
+                {Platform.OS === 'android' && (
+                  <TouchableOpacity 
+                    style={styles.oemSettingsBtn}
+                    onPress={() => AlarmModule.requestMiuiPermission()}
+                  >
+                    <Text style={styles.oemSettingsBtnText}>2. Allow Lockscreen Display (MIUI) 📺</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
         )}

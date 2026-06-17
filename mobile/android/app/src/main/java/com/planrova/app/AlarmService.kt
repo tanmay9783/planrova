@@ -109,6 +109,7 @@ class AlarmService : Service() {
             .build()
 
         // 5. Start Foreground Service
+        var fgsSuccess = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
                 startForeground(
@@ -116,10 +117,12 @@ class AlarmService : Service() {
                     notification,
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
                 )
+                fgsSuccess = true
             } catch (e: Exception) {
                 Log.e("AlarmService", "Failed to start FGS with mediaPlayback type, trying standard FGS", e)
                 try {
                     startForeground(NOTIFICATION_ID, notification)
+                    fgsSuccess = true
                 } catch (ex: Exception) {
                     Log.e("AlarmService", "Failed to start standard FGS as well", ex)
                 }
@@ -127,9 +130,16 @@ class AlarmService : Service() {
         } else {
             try {
                 startForeground(NOTIFICATION_ID, notification)
+                fgsSuccess = true
             } catch (e: Exception) {
                 Log.e("AlarmService", "Failed to start FGS below Android Q", e)
             }
+        }
+
+        if (!fgsSuccess) {
+            Log.e("AlarmService", "Failed to transition service into Foreground. Stopping self to avoid ANR/system crash.")
+            stopSelf()
+            return START_NOT_STICKY
         }
 
         // Direct Activity Launch if Overlay Permission is granted (bypasses background limitations)
@@ -235,16 +245,20 @@ class AlarmService : Service() {
 
     private fun startVibration() {
         stopVibration()
-        val vibratorService = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
-            vibratorManager.defaultVibrator
-        } else {
-            @Suppress("DEPRECATION")
-            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        val vibratorService = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vibratorManager?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+        } catch (e: Exception) {
+            null
         }
         vibrator = vibratorService
 
-        if (vibratorService.hasVibrator()) {
+        if (vibratorService != null && vibratorService.hasVibrator()) {
             val pattern = longArrayOf(0, 500, 500) // start immediately, 500ms on, 500ms off
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibratorService.vibrate(VibrationEffect.createWaveform(pattern, 0)) // repeat index 0
