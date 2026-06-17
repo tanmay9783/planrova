@@ -1567,9 +1567,17 @@ export default function AlarmScreen() {
               )}
             </View>
             
-            <Text style={styles.oemSettingsTip}>
-              💡 Xiaomi/POCO: Also manually grant "Show on Lock Screen" and "Start in Background" in App Info -&gt; Other Permissions.
-            </Text>
+            <View style={styles.oemSettingsTipContainer}>
+              <Text style={styles.oemSettingsTipText}>
+                💡 Xiaomi/POCO/Redmi: You must also manually grant "Show on Lock Screen" and "Start in Background" permissions.
+              </Text>
+              <TouchableOpacity 
+                style={styles.oemSettingsBtn}
+                onPress={() => AlarmModule.requestMiuiPermission()}
+              >
+                <Text style={styles.oemSettingsBtnText}>Open Other Permissions Settings</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -3485,16 +3493,34 @@ const styles = StyleSheet.create({
     color: '#F3F1EC',
     fontSize: 11,
   },
-  oemSettingsTip: {
+  oemSettingsTipContainer: {
+    marginTop: 12,
+    backgroundColor: '#1E1B15',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(194, 168, 120, 0.15)',
+    gap: 8,
+  },
+  oemSettingsTipText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 10,
     color: '#C2A878',
-    marginTop: 10,
     lineHeight: 14,
-    backgroundColor: '#1E1B15',
-    padding: 8,
-    borderRadius: 8,
+  },
+  oemSettingsBtn: {
+    backgroundColor: 'rgba(194, 168, 120, 0.12)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    alignItems: 'center',
+    alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: 'rgba(194, 168, 120, 0.15)',
+    borderColor: 'rgba(194, 168, 120, 0.25)',
+  },
+  oemSettingsBtnText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    color: '#C2A878',
+    fontSize: 10,
   },
 });

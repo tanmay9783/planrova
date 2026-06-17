@@ -163,4 +163,28 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
             }
         }
     }
+
+    @ReactMethod
+    fun requestMiuiPermission() {
+        try {
+            val intent = Intent("miui.intent.action.APP_PERM_EDITOR").apply {
+                setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
+                putExtra("extra_pkgname", reactContext.packageName)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            reactContext.startActivity(intent)
+            Log.d("AlarmModule", "Opened MIUI permission editor successfully")
+        } catch (e: Exception) {
+            Log.w("AlarmModule", "miui.intent.action.APP_PERM_EDITOR failed, falling back to standard App Settings", e)
+            try {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:${reactContext.packageName}")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                reactContext.startActivity(intent)
+            } catch (ex: Exception) {
+                Log.e("AlarmModule", "Error opening standard app details settings fallback", ex)
+            }
+        }
+    }
 }
