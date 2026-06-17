@@ -28,6 +28,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Notifications from 'expo-notifications';
 import { requestNotificationPermission } from '../utils/notifications';
 import { Accelerometer, Pedometer } from 'expo-sensors';
+import { useRoute } from '@react-navigation/native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -54,6 +55,7 @@ const MOTIVATIONAL_SENTENCES = [
 ];
 
 export default function AlarmScreen() {
+  const route = useRoute();
   const userId = auth.currentUser ? auth.currentUser.uid : 'guest';
   const [activeTab, setActiveTab] = useState('alarm'); // 'alarm' or 'sleep'
 
@@ -129,6 +131,23 @@ export default function AlarmScreen() {
 
   const [activeRingingAlarm, setActiveRingingAlarm] = useState(null);
 
+  // ── Trigger alarm ringing if screen opened from notification action ──
+  useEffect(() => {
+    if (route.params?.triggerAlarmOnOpen) {
+      const { alarmId, type } = route.params;
+      if (type === 'wake') {
+        if (alarmId === 'legacy-wake') {
+          triggerAlarm('wake', null);
+        } else {
+          const matchingAlarm = alarmsList.find(a => a.id === alarmId);
+          triggerAlarm('wake', matchingAlarm || null);
+        }
+      } else if (['water', 'meal', 'meds', 'winddown'].includes(type)) {
+        triggerAlarm(type);
+      }
+    }
+  }, [route.params, alarmsList]);
+
   // ── Notification Permission (contextual, on first screen visit) ──────────
   useEffect(() => {
     requestNotificationPermission();
@@ -153,6 +172,7 @@ export default function AlarmScreen() {
     for (const alarm of list) {
       if (!alarm.enabled) continue;
       const [h, m] = alarm.time.split(':').map(Number);
+      const ringtoneKey = alarm.ringtone?.assetKey || 'lofi';
 
       if (alarm.days && alarm.days.length > 0) {
         // Schedule for each selected weekday
@@ -164,11 +184,12 @@ export default function AlarmScreen() {
                 ? `Wake up mission: ${alarm.mission.toUpperCase()}. Complete your task to earn XP!`
                 : 'Time to wake up and start your day, grinder!',
               data: { type: 'alarm', alarmId: alarm.id },
-              sound: true,
+              sound: `${ringtoneKey}.mp3`,
+              categoryIdentifier: 'ALARM_CATEGORY',
             },
             trigger: {
               type: 'weekly',
-              channelId: 'default',
+              channelId: `alarm_${ringtoneKey}`,
               weekday: dayMap[day] + 1, // Expo weekday is 1=Sun...7=Sat
               hour: h,
               minute: m,
@@ -182,11 +203,12 @@ export default function AlarmScreen() {
             title: `⏰ Alarm — ${alarm.time}`,
             body: 'Time to wake up and start your day!',
             data: { type: 'alarm', alarmId: alarm.id },
-            sound: true,
+            sound: `${ringtoneKey}.mp3`,
+            categoryIdentifier: 'ALARM_CATEGORY',
           },
           trigger: {
             type: 'daily',
-            channelId: 'default',
+            channelId: `alarm_${ringtoneKey}`,
             hour: h,
             minute: m,
           },
@@ -197,6 +219,7 @@ export default function AlarmScreen() {
     // 2. Schedule legacy wake alarm if enabled
     if (legacyWakeAlarm && legacyWakeAlarm.wakeEnabled && legacyWakeAlarm.wakeTime) {
       const [h, m] = legacyWakeAlarm.wakeTime.split(':').map(Number);
+      const legacyRingtoneKey = legacyWakeAlarm.wakeRingtone?.assetKey || 'lofi';
       // Schedule legacy alarm for every day of the week
       for (const day of ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']) {
         await Notifications.scheduleNotificationAsync({
@@ -206,11 +229,12 @@ export default function AlarmScreen() {
               ? `Wake up mission: ${legacyWakeAlarm.wakeMission.toUpperCase()}. Complete your task to earn XP!`
               : 'Time to wake up and start your day, grinder!',
             data: { type: 'alarm', alarmId: 'legacy-wake' },
-            sound: true,
+            sound: `${legacyRingtoneKey}.mp3`,
+            categoryIdentifier: 'ALARM_CATEGORY',
           },
           trigger: {
             type: 'weekly',
-            channelId: 'default',
+            channelId: `alarm_${legacyRingtoneKey}`,
             weekday: dayMap[day] + 1, // 1=Sun...7=Sat
             hour: h,
             minute: m,

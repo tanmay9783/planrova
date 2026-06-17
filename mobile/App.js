@@ -20,11 +20,13 @@ import { useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJa
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from './src/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import RootNavigator from './src/navigation/RootNavigator';
 import { requestNotificationPermission } from './src/utils/notifications';
 import * as ImagePicker from 'expo-image-picker';
+import * as Notifications from 'expo-notifications';
+import { navigationRef, navigate } from './src/navigation/navigationRef';
 
 const CustomTheme = {
   ...DefaultTheme,
@@ -524,6 +526,90 @@ export default function App() {
       // when the user first tries to set an alarm — not on app startup.
     }
   }, [showMainApp]);
+
+  // Global Notification Response Listener
+  useEffect(() => {
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(async (response) => {
+      const data = response.notification.request.content.data;
+      const actionId = response.actionIdentifier;
+
+      if (data && (data.type === 'alarm' || ['water', 'meal', 'medication', 'winddown'].includes(data.type))) {
+        const type = data.type === 'medication' ? 'meds' : data.type;
+        const alarmId = data.alarmId;
+
+        // If the user tapped the "Snooze" action button directly from the notification
+        if (actionId === 'SNOOZE_ACTION') {
+          const soundFile = response.notification.request.content.sound;
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: response.notification.request.content.title + ' (Snoozed)',
+              body: response.notification.request.content.body,
+              categoryIdentifier: 'ALARM_CATEGORY',
+              sound: soundFile,
+              data: { ...data, isSnoozed: true },
+            },
+            trigger: {
+              seconds: 120, // 2 minutes
+              channelId: response.notification.request.trigger.channelId || 'default',
+            },
+          });
+
+          // Deduct 5 XP from Firestore
+          const user = auth.currentUser;
+          if (user) {
+            try {
+              const docRef = doc(db, 'users', user.uid, 'appData', 'gamification');
+              const docSnap = await getDoc(docRef);
+              let currentGamification = { level: 1, xp: 0 };
+              if (docSnap.exists()) {
+                const cloudData = docSnap.data();
+                if (cloudData.value && !cloudData.deleted) {
+                  currentGamification = JSON.parse(cloudData.value) || currentGamification;
+                }
+              }
+              let newXp = currentGamification.xp - 5;
+              let newLvl = currentGamification.level;
+              if (newXp < 0) {
+                if (newLvl > 1) {
+                  newLvl -= 1;
+                  newXp += newLvl * 100;
+                } else {
+                  newXp = 0;
+                }
+              }
+              const updatedGamification = { level: newLvl, xp: newXp };
+              await setDoc(docRef, {
+                id: 'gamification',
+                value: JSON.stringify(updatedGamification),
+                updated_at: Date.now(),
+                deleted: false
+              }, { merge: true });
+            } catch (err) {
+              console.warn("Error deducting XP in background snooze:", err);
+            }
+          }
+
+          Alert.alert(
+            "Snoozed (-5 XP) ⚠️", 
+            "Snoozing breaks focus habits. We'll ring again in 2 minutes. Get out of bed, grinder!"
+          );
+          return;
+        }
+
+        // If it's a normal tap or "Solve Mission" action button click
+        // Navigate to Alarm screen and pass the params to show the ringing modal
+        navigate('AlarmWorkspace', {
+          triggerAlarmOnOpen: true,
+          alarmId,
+          type
+        });
+      }
+    });
+
+    return () => {
+      responseSubscription.remove();
+    };
+  }, []);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -1087,7 +1173,7 @@ export default function App() {
         opacity: mainAppEntranceAnim,
         transform: [{ scale: mainAppScale }, { translateY: mainAppTranslateY }]
       }}>
-        <NavigationContainer theme={CustomTheme}>
+        <NavigationContainer ref={navigationRef} theme={CustomTheme}>
           <StatusBar barStyle="light-content" backgroundColor="#0F1115" />
           <RootNavigator />
         </NavigationContainer>
