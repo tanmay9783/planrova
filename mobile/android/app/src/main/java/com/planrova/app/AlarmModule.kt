@@ -65,7 +65,7 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun getTriggeredAlarm(promise: Promise) {
-        val activity = currentActivity
+        val activity = reactContext.currentActivity
         if (activity is AlarmActivity) {
             val alarmId = activity.intent.getStringExtra("alarm_id")
             promise.resolve(alarmId)

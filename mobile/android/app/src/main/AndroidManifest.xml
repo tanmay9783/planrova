@@ -39,38 +39,15 @@
         <category android:name="android.intent.category.LAUNCHER"/>
       </intent-filter>
     </activity>
-
-    <activity
-        android:name=".AlarmActivity"
-        android:showWhenLocked="true"
-        android:turnScreenOn="true"
-        android:launchMode="singleInstance"
-        android:excludeFromRecents="true"
-        android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode"
-        android:windowSoftInputMode="adjustResize"
-        android:screenOrientation="portrait"
-        android:exported="false" />
-
-    <service
-        android:name=".AlarmService"
-        android:foregroundServiceType="mediaPlayback"
-        android:exported="false" />
-
-    <receiver
-        android:name=".AlarmReceiver"
-        android:exported="false" />
-
-    <receiver
-        android:name=".AlarmActionReceiver"
-        android:exported="false" />
-
-    <receiver
-        android:name=".BootReceiver"
-        android:exported="true">
-        <intent-filter>
-            <action android:name="android.intent.action.BOOT_COMPLETED" />
-            <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-        </intent-filter>
+    <activity android:name=".AlarmActivity" android:showWhenLocked="true" android:turnScreenOn="true" android:launchMode="singleInstance" android:excludeFromRecents="true" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" android:windowSoftInputMode="adjustResize" android:screenOrientation="portrait" android:exported="false"/>
+    <service android:name=".AlarmService" android:foregroundServiceType="mediaPlayback" android:exported="false"/>
+    <receiver android:name=".AlarmReceiver" android:exported="false"/>
+    <receiver android:name=".AlarmActionReceiver" android:exported="false"/>
+    <receiver android:name=".BootReceiver" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED"/>
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+      </intent-filter>
     </receiver>
   </application>
 </manifest>
