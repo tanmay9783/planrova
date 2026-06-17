@@ -209,7 +209,7 @@ export default function AlarmScreen() {
               },
               trigger: {
                 type: 'weekly',
-                channelId: 'default',
+                channelId: 'default_v2',
                 weekday: dayMap[day] + 1,
                 hour: h,
                 minute: m,
@@ -246,7 +246,7 @@ export default function AlarmScreen() {
             },
             trigger: {
               type: 'daily',
-              channelId: 'default',
+              channelId: 'default_v2',
               hour: h,
               minute: m,
             },
@@ -293,7 +293,7 @@ export default function AlarmScreen() {
             },
             trigger: {
               type: 'weekly',
-              channelId: 'default',
+              channelId: 'default_v2',
               weekday: dayMap[day] + 1, // 1=Sun...7=Sat
               hour: h,
               minute: m,
@@ -327,7 +327,7 @@ export default function AlarmScreen() {
           },
           trigger: {
             type: 'daily',
-            channelId: 'default',
+            channelId: 'default_v2',
             hour: h,
             minute: m,
           },
@@ -347,7 +347,7 @@ export default function AlarmScreen() {
         },
         trigger: {
           type: 'daily',
-          channelId: 'default',
+          channelId: 'default_v2',
           hour: h,
           minute: m,
         },
@@ -366,7 +366,7 @@ export default function AlarmScreen() {
         },
         trigger: {
           type: 'daily',
-          channelId: 'default',
+          channelId: 'default_v2',
           hour: h,
           minute: m,
         },
@@ -385,7 +385,7 @@ export default function AlarmScreen() {
         },
         trigger: {
           type: 'daily',
-          channelId: 'default',
+          channelId: 'default_v2',
           hour: h,
           minute: m,
         },

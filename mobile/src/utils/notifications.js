@@ -30,7 +30,7 @@ export async function requestNotificationPermission() {
 
   // Set up Android channels if needed
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
+    await Notifications.setNotificationChannelAsync('default_v2', {
       name: 'Default Reminders',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
@@ -59,12 +59,19 @@ export async function requestNotificationPermission() {
     {
       identifier: 'SNOOZE_ACTION',
       buttonTitle: 'Snooze 2 mins (-5 XP)',
-      options: { isDestructive: false, isAuthenticationRequired: false },
+      options: { 
+        isDestructive: false, 
+        isAuthenticationRequired: false,
+        opensAppToForeground: true
+      },
     },
     {
       identifier: 'DISMISS_ACTION',
       buttonTitle: 'Solve Mission',
-      options: { isDestructive: true },
+      options: { 
+        isDestructive: true,
+        opensAppToForeground: true
+      },
     },
   ]);
 
@@ -85,10 +92,11 @@ export async function scheduleWaterReminders() {
       title: "Drink Water",
       body: "Time to take a sip! Keep your brain active for your next study session.",
       data: { type: 'water' },
+      sound: true,
     },
     trigger: {
       type: 'timeInterval',
-      channelId: 'default',
+      channelId: 'default_v2',
       seconds: 7200, // 2 hours
       repeats: true,
     },
@@ -109,10 +117,11 @@ export async function scheduleHabitNudges() {
       title: "Routine Check",
       body: "Have you checked off your daily habits today? Planrova is waiting!",
       data: { type: 'habits' },
+      sound: true,
     },
     trigger: {
       type: 'daily',
-      channelId: 'default',
+      channelId: 'default_v2',
       hour: 18,
       minute: 0,
     },
@@ -133,10 +142,11 @@ export async function scheduleFocusReminders() {
       title: "Deep Focus Time",
       body: "Set your intention and start a 25-minute Pomodoro session now.",
       data: { type: 'focus' },
+      sound: true,
     },
     trigger: {
       type: 'daily',
-      channelId: 'default',
+      channelId: 'default_v2',
       hour: 10,
       minute: 0,
     },
@@ -156,10 +166,11 @@ export async function scheduleDailyTaskReminders() {
       title: "Today's Study Agenda 📝",
       body: "Good morning! You have study tasks scheduled for today. Open Planrova to check off your targets.",
       data: { type: 'tasks' },
+      sound: true,
     },
     trigger: {
       type: 'daily',
-      channelId: 'default',
+      channelId: 'default_v2',
       hour: 9,
       minute: 0,
     },
@@ -189,7 +200,7 @@ export async function schedulePomodoroNotification(mode, secondsRemaining) {
     },
     trigger: {
       type: 'timeInterval',
-      channelId: 'default',
+      channelId: 'default_v2',
       seconds: secondsRemaining,
     },
   });
@@ -208,10 +219,11 @@ export async function scheduleWindDownNudges() {
       title: "Cosmic Wind-Down Time 🌙",
       body: "It's 9 PM! Time to rate your day, carry over unfinished tasks, and preview tomorrow.",
       data: { type: 'winddown' },
+      sound: true,
     },
     trigger: {
       type: 'daily',
-      channelId: 'default',
+      channelId: 'default_v2',
       hour: 21,
       minute: 0,
     },

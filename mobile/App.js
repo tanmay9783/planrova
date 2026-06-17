@@ -550,7 +550,7 @@ export default function App() {
             },
             trigger: {
               seconds: 120, // 2 minutes
-              channelId: response.notification.request.trigger.channelId || 'default',
+              channelId: response.notification.request.trigger.channelId || 'default_v2',
             },
           });
 
