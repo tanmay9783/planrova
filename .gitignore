@@ -40,3 +40,7 @@ scratch/
 
 # APK binaries — always upload to GitHub Releases, never commit to git
 *.apk
+
+# Private project documentation
+private-docs/
+

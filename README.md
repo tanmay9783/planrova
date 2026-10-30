@@ -464,7 +464,7 @@ eas build --platform android --profile preview
 
 ## 11. Quality Audit & Engineering Verification
 
-An evidence-based technical audit was conducted across the codebase (see [DOCUMENTATION_VERIFICATION_REPORT.md](file:///home/tanmay/Desktop/planrova/DOCUMENTATION_VERIFICATION_REPORT.md) for full audit trace):
+An evidence-based technical audit was conducted across the codebase (see [DOCUMENTATION_VERIFICATION_REPORT.md](file:///home/tanmay/Desktop/planrova/private-docs/DOCUMENTATION_VERIFICATION_REPORT.md) in `private-docs/` for full audit trace):
 
 | Evaluation Dimension | Status | Audit Findings & Recommendations |
 |---|:---:|---|
